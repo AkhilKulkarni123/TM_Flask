@@ -162,7 +162,7 @@ class User(db.Model, UserMixin):
     sections = db.relationship('Section', secondary=UserSection.__table__, lazy='subquery',
                                backref=db.backref('user_sections_rel', lazy=True, viewonly=True), overlaps="user_sections_rel,section,section_users_rel,user,users")
     
-    # Define one-to-one relationship with StockUser model
+    # Define one-to-one relationship with the StockUser model
     stock_user = db.relationship("StockUser", backref=db.backref("users", cascade="all"), lazy=True, uselist=False)
     # Add this line with the other relationships in the User class
     game_progress = db.relationship(

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Create a test user for logging in
+Create test users for logging in
 """
 
 import sys
@@ -12,7 +12,9 @@ from model.user import User
 
 def create_test_user():
     with app.app_context():
-        # Check if user already exists
+        # ---------------------------------------------------------
+        # 1) FIRST USER: testuser (original behavior untouched)
+        # ---------------------------------------------------------
         existing_user = User.query.filter_by(_uid='testuser').first()
         if existing_user:
             print("❌ Test user 'testuser' already exists!")
@@ -21,36 +23,65 @@ def create_test_user():
             print(f"   Role: {existing_user.role}")
             print(f"   Password: 123456")
             
-            # Update to Admin if not already
             if existing_user.role != 'Admin':
                 print("\n🔄 Updating user to Admin role...")
                 existing_user.role = 'Admin'
                 existing_user.update()
                 print("✅ User is now an Admin!")
-            return
-        
-        # Create a new test user as ADMIN
-        print("Creating test admin user...")
-        user = User(
-            name="Test User",
-            uid="testuser",
-            password="123456",  # Simple password for testing
-            role="Admin"  # Changed to Admin
-        )
-        
-        # Save to database
-        user.create()
-        
-        print("\n" + "="*50)
-        print("✅ ADMIN USER CREATED SUCCESSFULLY!")
-        print("="*50)
-        print(f"Username: testuser")
-        print(f"Password: 123456")
-        print(f"Name: Test User")
-        print(f"Role: Admin")  # Changed
-        print("="*50)
-        print("\n📌 Use these credentials to log in to your frontend!")
-        print("🎮 This user has ADMIN access!")
+        else:
+            print("Creating test admin user...")
+            user = User(
+                name="Test User",
+                uid="testuser",
+                password="123456",
+                role="Admin"
+            )
+            user.create()
+
+            print("\n" + "="*50)
+            print("✅ ADMIN USER CREATED SUCCESSFULLY!")
+            print("="*50)
+            print("Username: testuser")
+            print("Password: 123456")
+            print("Name: Test User")
+            print("Role: Admin")
+            print("="*50)
+
+        # ---------------------------------------------------------
+        # 2) SECOND USER: testplayer (NEW — regular user)
+        # ---------------------------------------------------------
+        print("\nChecking for additional test user 'testplayer'...")
+
+        existing_player = User.query.filter_by(_uid='testplayer').first()
+        if existing_player:
+            print("❌ User 'testplayer' already exists!")
+            print(f"   Name: {existing_player.name}")
+            print(f"   UID: {existing_player.uid}")
+            print(f"   Role: {existing_player.role}")
+            print(f"   Password: 123456")
+        else:
+            print("Creating second test user...")
+            player = User(
+                name="Test Player",
+                uid="testplayer",
+                password="123456",
+                role="User"    # normal user for gameplay login
+            )
+            player.create()
+
+            print("\n" + "="*50)
+            print("✅ SECOND TEST USER CREATED SUCCESSFULLY!")
+            print("="*50)
+            print("Username: testplayer")
+            print("Password: 123456")
+            print("Name: Test Player")
+            print("Role: User")
+            print("="*50)
+
+        print("\n📌 You now have TWO test accounts ready for your frontend!")
+        print("🎮 testuser   (Admin)")
+        print("🎮 testplayer (User)\n")
+
 
 if __name__ == '__main__':
     create_test_user()

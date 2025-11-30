@@ -18,31 +18,39 @@ def create_test_user():
             print("❌ Test user 'testuser' already exists!")
             print(f"   Name: {existing_user.name}")
             print(f"   UID: {existing_user.uid}")
+            print(f"   Role: {existing_user.role}")
             print(f"   Password: 123456")
+            
+            # Update to Admin if not already
+            if existing_user.role != 'Admin':
+                print("\n🔄 Updating user to Admin role...")
+                existing_user.role = 'Admin'
+                existing_user.update()
+                print("✅ User is now an Admin!")
             return
         
-        # Create a new test user
-        print("Creating test user...")
+        # Create a new test user as ADMIN
+        print("Creating test admin user...")
         user = User(
             name="Test User",
             uid="testuser",
             password="123456",  # Simple password for testing
-            role="Student"
+            role="Admin"  # Changed to Admin
         )
         
         # Save to database
         user.create()
         
         print("\n" + "="*50)
-        print("✅ TEST USER CREATED SUCCESSFULLY!")
+        print("✅ ADMIN USER CREATED SUCCESSFULLY!")
         print("="*50)
         print(f"Username: testuser")
         print(f"Password: 123456")
         print(f"Name: Test User")
-        print(f"Role: Student")
+        print(f"Role: Admin")  # Changed
         print("="*50)
         print("\n📌 Use these credentials to log in to your frontend!")
+        print("🎮 This user has ADMIN access!")
 
 if __name__ == '__main__':
     create_test_user()
-

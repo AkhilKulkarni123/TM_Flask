@@ -164,6 +164,13 @@ class User(db.Model, UserMixin):
     
     # Define one-to-one relationship with StockUser model
     stock_user = db.relationship("StockUser", backref=db.backref("users", cascade="all"), lazy=True, uselist=False)
+    # Add this line with the other relationships in the User class
+    game_progress = db.relationship(
+    "GameProgress",
+    backref="user_rel",
+    cascade="all, delete-orphan",
+    lazy=True
+)
 
     def __init__(self, name, uid, password=app.config["DEFAULT_PASSWORD"], kasm_server_needed=False, role="User", pfp='', grade_data=None, ap_exam=None, school="Unknown", sid=None):
         self._name = name

@@ -9,6 +9,13 @@ from flask import current_app
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 from api.jwt_authorize import token_required
+# New Game Imports for Snake and Ladders
+from api.websocket import init_websocket
+from flask_cors import CORS
+# import API blueprints
+from api.game import game_api
+from api.boss_battle import boss_api
+from api.admin import admin_api
 
 
 # import "objects" from "this" project
@@ -80,6 +87,10 @@ app.register_blueprint(feedback_api)
 app.register_blueprint(joke_api)  # Register the joke API blueprint
 app.register_blueprint(post_api)  # Register the social media post API
 # app.register_blueprint(announcement_api) ##temporary revert
+app.register_blueprint(game_api)
+app.register_blueprint(boss_api)
+app.register_blueprint(admin_api)
+
 
 # Jokes file initialization
 with app.app_context():

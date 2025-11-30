@@ -1,0 +1,248 @@
+from flask import Blueprint, request, jsonify, g
+from flask_cors import CORS
+from model.boss_room import BossRoom, BossPlayer, BossBattleStats
+from model.game_progress import GameProgress
+from model.user import User
+from __init__ import db
+from api.jwt_authorize import token_required
+import json
+import logging
+
+boss_api = Blueprint('boss_api', __name__, url_prefix='/api/boss')
+CORS(boss_api, supports_credentials=True, origins=['http://localhost:4500', 'https://akhilkulkarni123.github.io'])
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# WebSocket connections storage
+active_connections = {}
+
+
+@boss_api.route('/join', methods=['POST'])
+@token_required()
+def join_boss_battle():
+    """Join or create a boss battle room"""
+    try:
+        user = g.current_user
+        
+        # Check if player has reached square 25
+        progress = GameProgress.query.filter_by(user_id=user.id).first()
+        if not progress or progress.current_position < 25:
+            return jsonify({'error': 'You must reach square 25 first'}), 403
+        
+        # Check if player has enough bullets
+        if progress.bullets < 10:
+            return jsonify({'error': 'You need at least 10 bullets to fight the boss'}), 403
+        
+        # Find an active room or create a new one
+        room = BossRoom.query.filter_by(is_active=True, is_completed=False).first()
+        
+        if not room:
+            # Create new room
+            room = BossRoom(max_boss_health=1000)
+            db.session.add(room)
+            db.session.flush()
+        
+        # Check if player already in this room
+        existing_player = BossPlayer.query.filter_by(
+            room_id=room.id,
+            user_id=user.id
+        ).first()
+        
+        if existing_player:
+            return jsonify({
+                'message': 'Already in this room',
+                'room_id': room.room_id,
+                'room': room.to_dict(),
+                'player': existing_player.to_dict()
+            }), 200
+        
+        # Add player to room
+        player = BossPlayer(room_id=room.id, user_id=user.id, lives=progress.lives)
+        db.session.add(player)
+        
+        # Get or create boss stats
+        boss_stats = BossBattleStats.query.filter_by(user_id=user.id).first()
+        if not boss_stats:
+            boss_stats = BossBattleStats(user_id=user.id)
+            db.session.add(boss_stats)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Joined boss battle',
+            'room_id': room.room_id,
+            'room': room.to_dict(),
+            'player': player.to_dict(),
+            'players': room.get_player_stats()
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error joining boss battle: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to join boss battle'}), 500
+
+
+@boss_api.route('/room/<room_id>', methods=['GET'])
+@token_required()
+def get_room_status(room_id):
+    """Get current status of a boss room"""
+    try:
+        room = BossRoom.query.filter_by(room_id=room_id).first()
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        return jsonify({
+            'room': room.to_dict(),
+            'players': room.get_player_stats()
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error getting room status: {str(e)}")
+        return jsonify({'error': 'Failed to get room status'}), 500
+
+
+@boss_api.route('/damage', methods=['POST'])
+@token_required()
+def deal_damage():
+    """Player deals damage to boss"""
+    try:
+        user = g.current_user
+        data = request.get_json()
+        
+        room_id = data.get('room_id')
+        damage = data.get('damage', 10)
+        
+        if not room_id:
+            return jsonify({'error': 'Room ID required'}), 400
+        
+        room = BossRoom.query.filter_by(room_id=room_id).first()
+        if not room or not room.is_active:
+            return jsonify({'error': 'Room not active'}), 404
+        
+        player = BossPlayer.query.filter_by(
+            room_id=room.id,
+            user_id=user.id
+        ).first()
+        
+        if not player or not player.is_alive:
+            return jsonify({'error': 'Player not in room or dead'}), 403
+        
+        # Check if player has bullets
+        progress = GameProgress.query.filter_by(user_id=user.id).first()
+        if not progress or progress.bullets <= 0:
+            return jsonify({'error': 'No bullets left'}), 403
+        
+        # Deal damage
+        player.shoot_bullet(damage)
+        progress.spend_bullets(1)
+        new_health = room.damage_boss(damage)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Damage dealt',
+            'boss_health': new_health,
+            'bullets_remaining': progress.bullets,
+            'is_defeated': room.is_completed
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error dealing damage: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to deal damage'}), 500
+
+
+@boss_api.route('/hit', methods=['POST'])
+@token_required()
+def player_hit():
+    """Player gets hit by boss projectile"""
+    try:
+        user = g.current_user
+        data = request.get_json()
+        
+        room_id = data.get('room_id')
+        
+        if not room_id:
+            return jsonify({'error': 'Room ID required'}), 400
+        
+        room = BossRoom.query.filter_by(room_id=room_id).first()
+        if not room or not room.is_active:
+            return jsonify({'error': 'Room not active'}), 404
+        
+        player = BossPlayer.query.filter_by(
+            room_id=room.id,
+            user_id=user.id
+        ).first()
+        
+        if not player or not player.is_alive:
+            return jsonify({'error': 'Player not in room or already dead'}), 403
+        
+        # Take damage
+        player.take_damage()
+        
+        # Update game progress
+        progress = GameProgress.query.filter_by(user_id=user.id).first()
+        if progress:
+            progress.lose_life()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Took damage',
+            'lives': player.lives,
+            'is_alive': player.is_alive
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error processing hit: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to process hit'}), 500
+
+
+@boss_api.route('/leave', methods=['POST'])
+@token_required()
+def leave_battle():
+    """Leave the boss battle"""
+    try:
+        user = g.current_user
+        data = request.get_json()
+        
+        room_id = data.get('room_id')
+        
+        if not room_id:
+            return jsonify({'error': 'Room ID required'}), 400
+        
+        room = BossRoom.query.filter_by(room_id=room_id).first()
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        player = BossPlayer.query.filter_by(
+            room_id=room.id,
+            user_id=user.id
+        ).first()
+        
+        if player:
+            boss_stats = BossBattleStats.query.filter_by(user_id=user.id).first()
+            if boss_stats:
+                boss_stats.update_after_battle({
+                    'victory': player.victory,
+                    'damage_dealt': player.damage_dealt,
+                    'bullets_used': player.bullets_used,
+                    'is_alive': player.is_alive
+                })
+            
+            db.session.delete(player)
+            
+            remaining_players = BossPlayer.query.filter_by(room_id=room.id).count()
+            if remaining_players == 1:
+                room.is_active = False
+            
+            db.session.commit()
+        
+        return jsonify({'message': 'Left battle'}), 200
+    
+    except Exception as e:
+        logger.error(f"Error leaving battle: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to leave battle'})

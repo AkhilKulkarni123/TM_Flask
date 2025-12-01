@@ -19,3 +19,4 @@ python_dotenv
 boto3
 flask-sock==0.5.2
 simple-websocket==0.10.1
+gunicorn==21.2.0

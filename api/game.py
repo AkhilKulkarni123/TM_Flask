@@ -7,8 +7,11 @@ from api.jwt_authorize import token_required
 import logging
 
 game_api = Blueprint('game_api', __name__, url_prefix='/api/game')
-CORS(game_api, supports_credentials=True, origins=['http://localhost:4500'])
-
+CORS(game_api, supports_credentials=True, origins=[
+    'http://localhost:4500',
+    'http://127.0.0.1:4500',
+    'https://akhilkulkarni123.github.io'  # Your GitHub Pages domain
+])
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

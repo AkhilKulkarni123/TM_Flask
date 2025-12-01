@@ -9,8 +9,11 @@ import logging
 from functools import wraps
 
 admin_api = Blueprint('admin_api', __name__, url_prefix='/api/admin')
-CORS(admin_api, supports_credentials=True, origins=['http://localhost:4500'])
-
+CORS(admin_api, supports_credentials=True, origins=[
+    'http://localhost:4500',
+    'http://127.0.0.1:4500',
+    'https://akhilkulkarni123.github.io'
+])
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

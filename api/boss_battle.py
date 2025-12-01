@@ -9,8 +9,11 @@ import json
 import logging
 
 boss_api = Blueprint('boss_api', __name__, url_prefix='/api/boss')
-CORS(boss_api, supports_credentials=True, origins=['http://localhost:4500', 'https://akhilkulkarni123.github.io'])
-
+CORS(boss_api, supports_credentials=True, origins=[
+    'http://localhost:4500',
+    'http://127.0.0.1:4500',
+    'https://akhilkulkarni123.github.io'
+])
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

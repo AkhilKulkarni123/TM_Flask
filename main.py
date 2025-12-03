@@ -1,7 +1,7 @@
 # imports from flask
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
-from flask import abort, redirect, render_template, request, send_from_directory, url_for, jsonify, current_app, g # import render_template from "public" flask libraries
+from flask import abort, redirect, render_template, request, send_from_directory, url_for, jsonify, current_app, g
 from flask_login import current_user, login_user, logout_user
 from flask.cli import AppGroup
 from flask_login import current_user, login_required
@@ -12,14 +12,15 @@ from api.jwt_authorize import token_required
 # New Game Imports for Snake and Ladders
 from api.websocket import init_websocket
 from flask_cors import CORS
+
 # import API blueprints
 from api.game import game_api
 from api.boss_battle import boss_api
 from api.admin import admin_api
 
-
 # import "objects" from "this" project
-from __init__ import app, db, login_manager  # Key Flask objects 
+from __init__ import app, db, login_manager
+
 # API endpoints
 from api.user import user_api 
 from api.python_exec_api import python_exec_api
@@ -33,28 +34,26 @@ from api.groq_api import groq_api
 from api.gemini_api import gemini_api
 from api.microblog_api import microblog_api
 from api.classroom_api import classroom_api
-from hacks.joke import joke_api  # Import the joke API blueprint
-from api.post import post_api  # Import the social media post API
-#from api.announcement import announcement_api ##temporary revert
+from hacks.joke import joke_api
+from api.post import post_api
+from api.snakes_game import snakes_game_api  # NEW SNAKES GAME API
 
 # database Initialization functions
 from model.user import User, initUsers
-from model.user import Section;
+from model.user import Section
 from model.github import GitHubUser
 from model.feedback import Feedback
 from api.analytics import get_date_range
-# from api.grade_api import grade_api
 from api.study import study_api
 from api.feedback_api import feedback_api
 from model.study import Study, initStudies
 from model.classroom import Classroom
 from model.post import Post, init_posts
 from model.microblog import MicroBlog, Topic, init_microblogs
-from hacks.jokes import initJokes 
-# from model.announcement import Announcement ##temporary revert
+from hacks.jokes import initJokes
+from model.snakes_game import SnakesGameData, initSnakesGame  # NEW SNAKES GAME MODEL
 
 # server only Views
-
 import os
 import requests
 
@@ -64,8 +63,6 @@ load_dotenv()
 app.config['KASM_SERVER'] = os.getenv('KASM_SERVER')
 app.config['KASM_API_KEY'] = os.getenv('KASM_API_KEY')
 app.config['KASM_API_KEY_SECRET'] = os.getenv('KASM_API_KEY_SECRET')
-
-
 
 # register URIs for api endpoints
 app.register_blueprint(python_exec_api)
@@ -77,24 +74,22 @@ app.register_blueprint(stock_api)
 app.register_blueprint(groq_api)
 app.register_blueprint(gemini_api)
 app.register_blueprint(microblog_api)
-
 app.register_blueprint(analytics_api)
 app.register_blueprint(student_api)
-# app.register_blueprint(grade_api)
 app.register_blueprint(study_api)
 app.register_blueprint(classroom_api)
 app.register_blueprint(feedback_api)
-app.register_blueprint(joke_api)  # Register the joke API blueprint
-app.register_blueprint(post_api)  # Register the social media post API
-# app.register_blueprint(announcement_api) ##temporary revert
+app.register_blueprint(joke_api)
+app.register_blueprint(post_api)
 app.register_blueprint(game_api)
 app.register_blueprint(boss_api)
 app.register_blueprint(admin_api)
-
+app.register_blueprint(snakes_game_api)  # NEW SNAKES GAME BLUEPRINT
 
 # Jokes file initialization
 with app.app_context():
     initJokes()
+    initSnakesGame()  # NEW SNAKES GAME INITIALIZATION
 
 # Tell Flask-Login the view function name of your login route
 login_manager.login_view = "login"
@@ -133,7 +128,7 @@ def login():
             error = 'Invalid username or password.'
     return render_template("login.html", error=error, next=next_page)
 
-@app.route('/studytracker')  # route for the study tracker page
+@app.route('/studytracker')
 def studytracker():
     return render_template("studytracker.html")
     
@@ -142,17 +137,14 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-@app.errorhandler(404)  # catch for URL not found
+@app.errorhandler(404)
 def page_not_found(e):
-    # note that we set the 404 status explicitly
     return render_template('404.html'), 404
 
-@app.route('/')  # connects default URL to index() function
+@app.route('/')
 def index():
     print("Home:", current_user)
     return render_template("index.html")
-
-
 
 @app.route('/users/table2')
 @login_required
@@ -166,7 +158,6 @@ def sections():
     sections = Section.query.all()
     return render_template("sections.html", sections=sections)
 
-# Helper function to extract uploads for a user (ie PFP image)
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
@@ -190,34 +181,28 @@ def reset_password(user_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    # Set the new password
     if user.update({"password": app.config['DEFAULT_PASSWORD']}):
         return jsonify({'message': 'Password reset successfully'}), 200
     return jsonify({'error': 'Password reset failed'}), 500
 
 @app.route('/kasm_users')
 def kasm_users():
-    # Fetch configuration details from environment or app config
     SERVER = current_app.config.get('KASM_SERVER')
     API_KEY = current_app.config.get('KASM_API_KEY')
     API_KEY_SECRET = current_app.config.get('KASM_API_KEY_SECRET')
 
-    # Validate required configurations
     if not SERVER or not API_KEY or not API_KEY_SECRET:
         return render_template('error.html', message='KASM keys are missing'), 400
 
     try:
-        # Prepare API request details
         url = f"{SERVER}/api/public/get_users"
         data = {
             "api_key": API_KEY,
             "api_key_secret": API_KEY_SECRET
         }
 
-        # Perform the POST request
-        response = requests.post(url, json=data, timeout=10)  # Added timeout for reliability
+        response = requests.post(url, json=data, timeout=10)
 
-        # Validate the API response
         if response.status_code != 200:
             return render_template(
                 'error.html', 
@@ -225,34 +210,28 @@ def kasm_users():
                 code=response.status_code
             ), response.status_code
 
-        # Parse the users list from the response
         users = response.json().get('users', [])
 
-        # Process `last_session` and handle potential parsing issues
         for user in users:
             last_session = user.get('last_session')
             try:
                 user['last_session'] = datetime.fromisoformat(last_session) if last_session else None
             except ValueError:
-                user['last_session'] = None  # Fallback for invalid date formats
+                user['last_session'] = None
 
-        # Sort users by `last_session`, treating `None` as the oldest date
         sorted_users = sorted(
             users, 
             key=lambda x: x['last_session'] or datetime.min, 
             reverse=True
         )
 
-        # Render the sorted users in the template
         return render_template('kasm_users.html', users=sorted_users)
 
     except requests.RequestException as e:
-        # Handle connection errors or other request exceptions
         return render_template(
             'error.html', 
             message=f"Error connecting to KASM API: {str(e)}"
         ), 500
-        
         
 @app.route('/delete_user/<user_id>', methods=['DELETE'])
 def delete_user_kasm(user_id):
@@ -267,7 +246,6 @@ def delete_user_kasm(user_id):
         return {'message': 'KASM keys are missing'}, 400
 
     try:
-        # Kasm API to delete a user
         url = f"{SERVER}/api/public/delete_user"
         data = {
             "api_key": API_KEY,
@@ -285,49 +263,36 @@ def delete_user_kasm(user_id):
     except requests.RequestException as e:
         return {'message': 'Error connecting to KASM API', 'error': str(e)}, 500
 
-
 @app.route('/update_user/<string:uid>', methods=['PUT'])
 def update_user(uid):
-    # Authorization check
     if current_user.role != 'Admin':
         return jsonify({'error': 'Unauthorized'}), 403
 
-    # Get the JSON data from the request
     data = request.get_json()
-    print(f"Request Data: {data}")  # Log the incoming data
+    print(f"Request Data: {data}")
 
-    # Find the user in the database
     user = User.query.filter_by(_uid=uid).first()
     if user:
-        print(f"Found user: {user.uid}")  # Log the found user's UID
-        
-        # Update the user using the provided data
-        user.update(data)  # Assuming `user.update(data)` is a method on your User model
-        
-        # Save changes to the database
+        print(f"Found user: {user.uid}")
+        user.update(data)
         return jsonify({"message": "User updated successfully."}), 200
     else:
-        print("User not found.")  # Log when user is not found
+        print("User not found.")
         return jsonify({"message": "User not found."}), 404
 
-
-
-    
 # Create an AppGroup for custom commands
 custom_cli = AppGroup('custom', help='Custom commands')
 
-# Define a command to run the data generation functions
 @custom_cli.command('generate_data')
 def generate_data():
     initUsers()
     init_microblogs()
+    initSnakesGame()  # NEW
 
-# Register the custom command group with the Flask application
 app.cli.add_command(custom_cli)
         
-# this runs the flask application on the development server
 if __name__ == "__main__":
     host = "0.0.0.0"
     port = app.config['FLASK_PORT']
-    print(f"** Server running: http://localhost:{port}")  # Pretty link
+    print(f"** Server running: http://localhost:{port}")
     app.run(debug=True, host=host, port=port, use_reloader=False)

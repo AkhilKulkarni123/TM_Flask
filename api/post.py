@@ -5,8 +5,8 @@ Flask REST API endpoints for creating, reading, updating, and deleting posts
 from flask import Blueprint, request, jsonify, g
 from flask_restful import Api, Resource
 from __init__ import db
-from model.post import Post
-from model.user import User
+from models.post import Post
+from models.user import User
 from api.jwt_authorize import token_required
 
 

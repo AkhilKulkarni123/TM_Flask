@@ -3,8 +3,8 @@ from flask_restful import Api, Resource
 from flask_login import current_user, login_required
 from datetime import datetime
 from api.jwt_authorize import token_required
-from model.github import GitHubUser, GitHubOrg
-from model.user import User
+from models.github import GitHubUser, GitHubOrg
+from models.user import User
 import time
 
 

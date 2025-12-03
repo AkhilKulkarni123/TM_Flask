@@ -12,9 +12,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from __init__ import app, db
-from model.user import User
-from model.game_progress import GameProgress, SquareCompletion
-from model.boss_room import BossRoom, BossPlayer, BossBattleStats
+from models.user import User
+from models.game_progress import GameProgress, SquareCompletion
+from models.boss_room import BossRoom, BossPlayer, BossBattleStats
 from datetime import datetime
 
 

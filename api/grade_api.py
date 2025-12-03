@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify, g
 from flask_restful import Api, Resource
 from api.jwt_authorize import token_required
-from model.user import User
-from model.grade_model import GradePredictionModel
+from models.user import User
+from models.grade_model import GradePredictionModel
 
 # Set up blueprint and API
 grade_api = Blueprint('grade_api', __name__, url_prefix='/api/grade')

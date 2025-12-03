@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from __init__ import app, db
-from model.user import User
+from models.user import User
 
 def create_test_user():
     with app.app_context():

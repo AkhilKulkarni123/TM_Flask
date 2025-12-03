@@ -1,8 +1,8 @@
 from flask import Blueprint, g, request
 from flask_restful import Api, Resource
 from api.jwt_authorize import token_required
-from models.user import User
-from models.pfp import pfp_base64_decode, pfp_base64_upload, pfp_file_delete
+from model.user import User
+from model.pfp import pfp_base64_decode, pfp_base64_upload, pfp_file_delete
 
 pfp_api = Blueprint('pfp_api', __name__, url_prefix='/api/id')
 api = Api(pfp_api)

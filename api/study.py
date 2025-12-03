@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
-from models.study import Study
+from model.study import Study
 from __init__ import db
 import json
 from datetime import datetime

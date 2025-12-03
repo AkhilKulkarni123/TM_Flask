@@ -5,7 +5,7 @@ Handles CRUD operations for micro blog posts, replies, reactions, and topics
 from flask import Blueprint, request, jsonify, g
 from flask_restful import Api, Resource
 from api.jwt_authorize import token_required
-from models.microblog import MicroBlog, Topic
+from model.microblog import MicroBlog, Topic
 from __init__ import db
 
 

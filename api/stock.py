@@ -4,8 +4,8 @@ from flask_restful import Api, Resource # used for REST API building
 from datetime import datetime
 import requests
 from api.jwt_authorize import token_required
-from models.user import User
-from models.stocks import StockUser,StockTransaction,TableStock, UserTransactionStock
+from model.user import User
+from model.stocks import StockUser,StockTransaction,TableStock, UserTransactionStock
 
 stock_api = Blueprint('stock_api', __name__,
                    url_prefix='/stock')

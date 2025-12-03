@@ -2,7 +2,7 @@ from flask import request
 from flask import current_app, g
 from functools import wraps
 import jwt
-from models.user import User
+from model.user import User
 
 def token_required(roles=None):
     '''

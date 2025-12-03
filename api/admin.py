@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify, g, render_template
 from flask_cors import CORS
-from models.game_progress import GameProgress, SquareCompletion
-from models.boss_room import BossRoom, BossPlayer, BossBattleStats
-from models.user import User
+from model.game_progress import GameProgress, SquareCompletion
+from model.boss_room import BossRoom, BossPlayer, BossBattleStats
+from model.user import User
 from __init__ import db
 from api.jwt_authorize import token_required
 import logging

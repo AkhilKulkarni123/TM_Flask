@@ -2,7 +2,7 @@ import os
 import requests
 from flask import Blueprint, request, jsonify, session 
 from flask_restful import Api, Resource
-from models.feedback import Feedback
+from model.feedback import Feedback
 from __init__ import app, db
 
 feedback_api = Blueprint('feedback_api', __name__, url_prefix='/api/feedback')

@@ -12,6 +12,10 @@ from api.jwt_authorize import token_required
 # New Game Imports for Snake and Ladders
 from api.websocket import init_websocket
 from flask_cors import CORS
+from flask import Flask, request, make_response, jsonify
+from flask_cors import CORS
+import os
+from dotenv import load_dotenv
 
 # import API blueprints
 from api.game import game_api
@@ -60,11 +64,35 @@ import requests
 # Load environment variables
 load_dotenv()
 
+# ============================================================================
+# CORS CONFIGURATION - CRITICAL FIX FOR FRONTEND CONNECTION
+# ============================================================================
+CORS(app, 
+     supports_credentials=True,
+     origins=[
+         "http://localhost:4500",
+         "http://127.0.0.1:4500",
+         "https://akhilkulkarni123.github.io",
+         "http://localhost:4000",
+         "http://127.0.0.1:4000"
+     ],
+     allow_headers=["Content-Type", "Authorization", "Set-Cookie"],
+     expose_headers=["Set-Cookie"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
+# ============================================================================
+# APP CONFIGURATION
+# ============================================================================
 app.config['KASM_SERVER'] = os.getenv('KASM_SERVER')
 app.config['KASM_API_KEY'] = os.getenv('KASM_API_KEY')
 app.config['KASM_API_KEY_SECRET'] = os.getenv('KASM_API_KEY_SECRET')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-this')
+app.config['DEFAULT_PASSWORD'] = os.getenv('DEFAULT_PASSWORD', '123Qwerty!')
 
-# register URIs for api endpoints
+# ============================================================================
+# REGISTER API BLUEPRINTS
+# ============================================================================
 app.register_blueprint(python_exec_api)
 app.register_blueprint(javascript_exec_api)
 app.register_blueprint(user_api)
@@ -86,11 +114,17 @@ app.register_blueprint(boss_api)
 app.register_blueprint(admin_api)
 app.register_blueprint(snakes_game_api)  # NEW SNAKES GAME BLUEPRINT
 
+# ============================================================================
+# DATABASE INITIALIZATION
+# ============================================================================
 # Jokes file initialization
 with app.app_context():
     initJokes()
     initSnakesGame()  # NEW SNAKES GAME INITIALIZATION
 
+# ============================================================================
+# FLASK-LOGIN CONFIGURATION
+# ============================================================================
 # Tell Flask-Login the view function name of your login route
 login_manager.login_view = "login"
 
@@ -107,6 +141,9 @@ def load_user(user_id):
 def inject_user():
     return dict(current_user=current_user)
 
+# ============================================================================
+# AUTHENTICATION ROUTES (SERVER-SIDE HTML)
+# ============================================================================
 # Helper function to check if the URL is safe for redirects
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
@@ -137,10 +174,51 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
+# ============================================================================
+# API HEALTH CHECK & ROOT
+# ============================================================================
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """API health check endpoint"""
+    return jsonify({
+        "status": "ok", 
+        "message": "Backend is running",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+@app.route('/api')
+def api_root():
+    """API root endpoint"""
+    return jsonify({
+        "message": "Flask Backend API", 
+        "version": "1.0",
+        "endpoints": {
+            "health": "/api/health",
+            "authenticate": "/api/authenticate",
+            "user": "/api/user",
+            "id": "/api/id"
+        }
+    }), 200
+
+# ============================================================================
+# ERROR HANDLERS
+# ============================================================================
 @app.errorhandler(404)
 def page_not_found(e):
+    # Check if it's an API request
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
     return render_template('404.html'), 404
 
+@app.errorhandler(500)
+def internal_error(e):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal server error'}), 500
+    return render_template('500.html'), 500
+
+# ============================================================================
+# SERVER-SIDE HTML ROUTES
+# ============================================================================
 @app.route('/')
 def index():
     print("Home:", current_user)
@@ -161,7 +239,10 @@ def sections():
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
- 
+
+# ============================================================================
+# USER MANAGEMENT ROUTES
+# ============================================================================
 @app.route('/users/delete/<int:user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
@@ -185,6 +266,26 @@ def reset_password(user_id):
         return jsonify({'message': 'Password reset successfully'}), 200
     return jsonify({'error': 'Password reset failed'}), 500
 
+@app.route('/update_user/<string:uid>', methods=['PUT'])
+def update_user(uid):
+    if current_user.role != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    print(f"Request Data: {data}")
+
+    user = User.query.filter_by(_uid=uid).first()
+    if user:
+        print(f"Found user: {user.uid}")
+        user.update(data)
+        return jsonify({"message": "User updated successfully."}), 200
+    else:
+        print("User not found.")
+        return jsonify({"message": "User not found."}), 404
+
+# ============================================================================
+# KASM INTEGRATION ROUTES
+# ============================================================================
 @app.route('/kasm_users')
 def kasm_users():
     SERVER = current_app.config.get('KASM_SERVER')
@@ -263,23 +364,9 @@ def delete_user_kasm(user_id):
     except requests.RequestException as e:
         return {'message': 'Error connecting to KASM API', 'error': str(e)}, 500
 
-@app.route('/update_user/<string:uid>', methods=['PUT'])
-def update_user(uid):
-    if current_user.role != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    data = request.get_json()
-    print(f"Request Data: {data}")
-
-    user = User.query.filter_by(_uid=uid).first()
-    if user:
-        print(f"Found user: {user.uid}")
-        user.update(data)
-        return jsonify({"message": "User updated successfully."}), 200
-    else:
-        print("User not found.")
-        return jsonify({"message": "User not found."}), 404
-
+# ============================================================================
+# CLI COMMANDS
+# ============================================================================
 # Create an AppGroup for custom commands
 custom_cli = AppGroup('custom', help='Custom commands')
 
@@ -290,9 +377,13 @@ def generate_data():
     initSnakesGame()  # NEW
 
 app.cli.add_command(custom_cli)
-        
+
+# ============================================================================
+# RUN APPLICATION
+# ============================================================================
 if __name__ == "__main__":
     host = "0.0.0.0"
-    port = app.config['FLASK_PORT']
+    port = int(os.getenv('FLASK_PORT', 8001))
     print(f"** Server running: http://localhost:{port}")
+    print(f"** API endpoints available at: http://localhost:{port}/api")
     app.run(debug=True, host=host, port=port, use_reloader=False)

@@ -1,5 +1,5 @@
 import jwt
-from flask import Blueprint, app, request, jsonify, current_app, Response, g
+from flask import Blueprint, app, request, jsonify, current_app, Response, g, make_response
 from flask_restful import Api, Resource # used for REST API building
 from datetime import datetime
 from __init__ import app
@@ -138,13 +138,86 @@ class UserAPI:
                     db_user = User.query.filter_by(_uid=uid).first()
                     if db_user:
                         #print(f"User exists in DB but create returned None: {db_user.uid}")
-                        return jsonify(db_user.read())  # Return the user anyway
+                        
+                        # Generate JWT token for auto-login after signup
+                        token = jwt.encode(
+                            {"_uid": db_user._uid},
+                            current_app.config["SECRET_KEY"],
+                            algorithm="HS256"
+                        )
+                        
+                        response = make_response(jsonify({
+                            'message': 'User created successfully',
+                            'user': db_user.read(),
+                            'token': token
+                        }), 200)
+                        
+                        # Set cookie
+                        is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                        if is_production:
+                            response.set_cookie(
+                                current_app.config.get("JWT_TOKEN_NAME", "jwt"),
+                                token,
+                                max_age=43200,
+                                secure=True,
+                                httponly=True,
+                                path='/',
+                                samesite='None'
+                            )
+                        else:
+                            response.set_cookie(
+                                current_app.config.get("JWT_TOKEN_NAME", "jwt"),
+                                token,
+                                max_age=43200,
+                                secure=False,
+                                httponly=False,
+                                path='/',
+                                samesite='Lax'
+                            )
+                        
+                        return response
                     else:
                         return {'message': f'Processed {name}, either a format error or User ID {uid} is duplicate'}, 400
                 
                 #print(f"Successfully created user: {user.uid}")
-                # return response, the created user details as a JSON object
-                return jsonify(user.read())
+                
+                # Generate JWT token for auto-login after signup
+                token = jwt.encode(
+                    {"_uid": user._uid},
+                    current_app.config["SECRET_KEY"],
+                    algorithm="HS256"
+                )
+                
+                response = make_response(jsonify({
+                    'message': 'User created successfully',
+                    'user': user.read(),
+                    'token': token
+                }), 200)
+                
+                # Set cookie
+                is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                if is_production:
+                    response.set_cookie(
+                        current_app.config.get("JWT_TOKEN_NAME", "jwt"),
+                        token,
+                        max_age=43200,
+                        secure=True,
+                        httponly=True,
+                        path='/',
+                        samesite='None'
+                    )
+                else:
+                    response.set_cookie(
+                        current_app.config.get("JWT_TOKEN_NAME", "jwt"),
+                        token,
+                        max_age=43200,
+                        secure=False,
+                        httponly=False,
+                        path='/',
+                        samesite='Lax'
+                    )
+                
+                return response
                 
             except Exception as e:
                 #print(f"Error creating user: {e}")
@@ -360,18 +433,16 @@ class UserAPI:
                         # Create JSON response
                         response_data = {
                             "message": f"Authentication for {user._uid} successful",
-                            "user": {
-                                "uid": user._uid,
-                                "name": user.name,
-                                "role": user.role
-                            }
+                            "user": user.read(),
+                            "token": token
                         }
-                        resp = jsonify(response_data)
+                        resp = make_response(jsonify(response_data), 200)
                         
                         # Set cookie
+                        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
                         if is_production:
                             resp.set_cookie(
-                                current_app.config["JWT_TOKEN_NAME"],
+                                cookie_name,
                                 token,
                                 max_age=43200,  # 12 hours in seconds
                                 secure=True,
@@ -381,11 +452,11 @@ class UserAPI:
                             )
                         else:
                             resp.set_cookie(
-                                current_app.config["JWT_TOKEN_NAME"],
+                                cookie_name,
                                 token,
                                 max_age=43200,  # 12 hours in seconds
                                 secure=False,
-                                httponly=False,  # Set to True for more security if JS access not needed
+                                httponly=False,  # Set to False for local development
                                 path='/',
                                 samesite='Lax'
                             )
@@ -425,9 +496,10 @@ class UserAPI:
                 # Prepare a response indicating the token has been invalidated
                 resp = Response("Token invalidated successfully")
                 is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
                 if is_production:
                     resp.set_cookie(
-                        current_app.config["JWT_TOKEN_NAME"],
+                        cookie_name,
                         token,
                         max_age=0,  # Immediately expire the cookie
                         secure=True,
@@ -437,11 +509,11 @@ class UserAPI:
                     )
                 else:
                     resp.set_cookie(
-                        current_app.config["JWT_TOKEN_NAME"],
+                        cookie_name,
                         token,
                         max_age=0,  # Immediately expire the cookie
                         secure=False,
-                        httponly=False,  # Set to True for more security if JS access not needed
+                        httponly=False,  # Set to False for local development
                         path='/',
                         samesite='Lax'
                     )
@@ -640,10 +712,10 @@ class UserAPI:
                 return {'message': 'Password is missing, or is less than 2 characters'}, 400
 
             # Auto-generate required fields for guest accounts
-            name = f"Guest_{uid}"
-            email = "?"
-            sid = "?"
-            school = "?"
+            name = body.get('name', f"Guest_{uid}")
+            email = body.get('email', "?")
+            sid = body.get('sid', "?")
+            school = body.get('school', "?")
 
             # Create User object with auto-generated name
             user_obj = User(name=name, uid=uid, password=password)
@@ -667,12 +739,85 @@ class UserAPI:
                     # Check if user was actually created in database
                     db_user = User.query.filter_by(_uid=uid).first()
                     if db_user:
-                        return jsonify(db_user.read())
+                        # Generate JWT token for auto-login
+                        token = jwt.encode(
+                            {"_uid": db_user._uid},
+                            current_app.config["SECRET_KEY"],
+                            algorithm="HS256"
+                        )
+                        
+                        response = make_response(jsonify({
+                            'message': 'Guest user created successfully',
+                            'user': db_user.read(),
+                            'token': token
+                        }), 200)
+                        
+                        # Set cookie
+                        is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+                        if is_production:
+                            response.set_cookie(
+                                cookie_name,
+                                token,
+                                max_age=43200,
+                                secure=True,
+                                httponly=True,
+                                path='/',
+                                samesite='None'
+                            )
+                        else:
+                            response.set_cookie(
+                                cookie_name,
+                                token,
+                                max_age=43200,
+                                secure=False,
+                                httponly=False,
+                                path='/',
+                                samesite='Lax'
+                            )
+                        
+                        return response
                     else:
                         return {'message': f'Failed to create guest account for {uid}, username may already exist'}, 400
 
-                # Return the created user details
-                return jsonify(user.read())
+                # Generate JWT token for auto-login
+                token = jwt.encode(
+                    {"_uid": user._uid},
+                    current_app.config["SECRET_KEY"],
+                    algorithm="HS256"
+                )
+                
+                response = make_response(jsonify({
+                    'message': 'Guest user created successfully',
+                    'user': user.read(),
+                    'token': token
+                }), 200)
+                
+                # Set cookie
+                is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+                if is_production:
+                    response.set_cookie(
+                        cookie_name,
+                        token,
+                        max_age=43200,
+                        secure=True,
+                        httponly=True,
+                        path='/',
+                        samesite='None'
+                    )
+                else:
+                    response.set_cookie(
+                        cookie_name,
+                        token,
+                        max_age=43200,
+                        secure=False,
+                        httponly=False,
+                        path='/',
+                        samesite='Lax'
+                    )
+                
+                return response
 
             except Exception as e:
                 return {'message': f'Error creating guest user: {str(e)}'}, 500

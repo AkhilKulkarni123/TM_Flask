@@ -22,3 +22,10 @@ simple-websocket==0.10.1
 gunicorn==21.2.0
 flask-socketio
 python-socketio
+flask
+flask-cors
+flask-restful
+flask-sqlalchemy
+python-dotenv
+PyJWT
+werkzeug

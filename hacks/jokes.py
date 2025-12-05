@@ -1,40 +1,45 @@
 import random, json, os, fcntl
 from flask import current_app
 
-jokes_data = []
-joke_list = [
-    "If you give someone a program... you will frustrate them for a day; if you teach them how to program... you will "
-    "frustrate them for a lifetime.",
-    "Q: Why did I divide sin by tan? A: Just cos.",
-    "UNIX is basically a simple operating system... but you have to be a genius to understand the simplicity.",
-    "Enter any 11-digit prime number to continue.",
-    "If at first you don't succeed; call it version 1.0.",
-    "Java programmers are some of the most materialistic people I know, very object-oriented",
-    "The oldest computer can be traced back to Adam and Eve. It was an apple but with extremely limited memory. Just "
-    "1 byte. And then everything crashed.",
-    "Q: Why did Wi-Fi and the computer get married? A: Because they had a connection",
-    "Bill Gates teaches a kindergarten class to count to ten. 1, 2, 3, 3.1, 95, 98, ME, 2000, XP, Vista, 7, 8, 10.",
-    "Q: What’s a aliens favorite computer key? A: the space bar!",
-    "There are 10 types of people in the world: those who understand binary, and those who don’t.",
-    "If it wasn't for C, we’d all be programming in BASI and OBOL.",
-    "Computers make very fast, very accurate mistakes.",
-    "Q: Why is it that programmers always confuse Halloween with Christmas? A: Because 31 OCT = 25 DEC.",
-    "Q: How many programmers does it take to change a light bulb? A: None. It’s a hardware problem.",
-    "The programmer got stuck in the shower because the instructions on the shampoo bottle said: Lather, Rinse, Repeat.",
-    "Q: What is the biggest lie in the entire universe? A: I have read and agree to the Terms and Conditions.",
-    'An SQL statement walks into a bar and sees two tables. It approaches, and asks may I join you?'
+csp_topics_data = []
+
+# AP CSP Topics - Big Ideas 1-5
+topic_list = [
+    "Big Idea 1: Creative Development - Collaboration and program development",
+    "Big Idea 1: Creative Development - Design and testing",
+    "Big Idea 2: Data - Binary numbers and data compression",
+    "Big Idea 2: Data - Extracting information from data",
+    "Big Idea 2: Data - Using programs with data",
+    "Big Idea 3: Algorithms and Programming - Variables and assignments",
+    "Big Idea 3: Algorithms and Programming - Data abstraction (lists)",
+    "Big Idea 3: Algorithms and Programming - Mathematical expressions",
+    "Big Idea 3: Algorithms and Programming - Strings",
+    "Big Idea 3: Algorithms and Programming - Boolean expressions",
+    "Big Idea 3: Algorithms and Programming - Conditionals (if/else)",
+    "Big Idea 3: Algorithms and Programming - Loops (iteration)",
+    "Big Idea 3: Algorithms and Programming - Functions and procedures",
+    "Big Idea 3: Algorithms and Programming - Algorithms",
+    "Big Idea 3: Algorithms and Programming - Simulations",
+    "Big Idea 4: Computing Systems and Networks - Internet basics",
+    "Big Idea 4: Computing Systems and Networks - Fault tolerance and redundancy",
+    "Big Idea 4: Computing Systems and Networks - Parallel and distributed computing",
+    "Big Idea 5: Impact of Computing - Beneficial and harmful effects",
+    "Big Idea 5: Impact of Computing - Digital divide",
+    "Big Idea 5: Impact of Computing - Bias in computing",
+    "Big Idea 5: Impact of Computing - Legal and ethical concerns (privacy, intellectual property)",
+    "Big Idea 5: Impact of Computing - Safe computing and cybersecurity"
 ]
 
-def get_jokes_file():
-    # Always use Flask app.config['DATA_FOLDER'] for shared data
+def get_topics_file():
+    # Use Flask app.config['DATA_FOLDER'] for shared data
     data_folder = current_app.config['DATA_FOLDER']
-    return os.path.join(data_folder, 'jokes.json')
+    return os.path.join(data_folder, 'csp_topics.json')
 
-def _read_jokes_file():
-    JOKES_FILE = get_jokes_file()
-    if not os.path.exists(JOKES_FILE):
+def _read_topics_file():
+    TOPICS_FILE = get_topics_file()
+    if not os.path.exists(TOPICS_FILE):
         return []
-    with open(JOKES_FILE, 'r') as f:
+    with open(TOPICS_FILE, 'r') as f:
         fcntl.flock(f, fcntl.LOCK_SH)
         try:
             data = json.load(f)
@@ -43,108 +48,126 @@ def _read_jokes_file():
         fcntl.flock(f, fcntl.LOCK_UN)
     return data
 
-def _write_jokes_file(data):
-    JOKES_FILE = get_jokes_file()
-    with open(JOKES_FILE, 'w') as f:
+def _write_topics_file(data):
+    TOPICS_FILE = get_topics_file()
+    with open(TOPICS_FILE, 'w') as f:
         fcntl.flock(f, fcntl.LOCK_EX)
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
         fcntl.flock(f, fcntl.LOCK_UN)
 
 def initJokes():
-    JOKES_FILE = get_jokes_file()
+    """Initialize topics (keeping function name for compatibility)"""
+    TOPICS_FILE = get_topics_file()
     # Only initialize if file does not exist
-    if os.path.exists(JOKES_FILE):
+    if os.path.exists(TOPICS_FILE):
         return
-    jokes_data = []
+    csp_topics_data = []
     item_id = 0
-    for item in joke_list:
-        jokes_data.append({"id": item_id, "joke": item, "haha": 0, "boohoo": 0})
+    for item in topic_list:
+        csp_topics_data.append({
+            "id": item_id, 
+            "topic": item, 
+            "need_review": 0,      # Students who need review on this
+            "understand_well": 0    # Students who understand this well
+        })
         item_id += 1
-    # prime some haha responses
+    
+    # Add some initial random votes for testing
+    for i in range(15):
+        id = random.choice(csp_topics_data)['id']
+        csp_topics_data[id]['need_review'] += 1
     for i in range(10):
-        id = random.choice(jokes_data)['id']
-        jokes_data[id]['haha'] += 1
-    for i in range(5):
-        id = random.choice(jokes_data)['id']
-        jokes_data[id]['boohoo'] += 1
-    _write_jokes_file(jokes_data)
+        id = random.choice(csp_topics_data)['id']
+        csp_topics_data[id]['understand_well'] += 1
+    
+    _write_topics_file(csp_topics_data)
         
 def getJokes():
-    return _read_jokes_file()
+    """Get all topics"""
+    return _read_topics_file()
 
 def getJoke(id):
-    jokes = _read_jokes_file()
-    return jokes[id]
+    """Get a specific topic by id"""
+    topics = _read_topics_file()
+    return topics[id]
 
 def getRandomJoke():
-    jokes = _read_jokes_file()
-    return random.choice(jokes)
+    """Get a random topic"""
+    topics = _read_topics_file()
+    return random.choice(topics)
 
 def favoriteJoke():
-    jokes = _read_jokes_file()
-    best = 0
-    bestID = -1
-    for joke in jokes:
-        if joke['haha'] > best:
-            best = joke['haha']
-            bestID = joke['id']
-    return jokes[bestID] if bestID != -1 else None
+    """Get the topic most students need help with"""
+    topics = _read_topics_file()
+    most_needed = 0
+    most_needed_id = -1
+    for topic in topics:
+        if topic['need_review'] > most_needed:
+            most_needed = topic['need_review']
+            most_needed_id = topic['id']
+    return topics[most_needed_id] if most_needed_id != -1 else None
     
 def jeeredJoke():
-    jokes = _read_jokes_file()
-    worst = 0
-    worstID = -1
-    for joke in jokes:
-        if joke['boohoo'] > worst:
-            worst = joke['boohoo']
-            worstID = joke['id']
-    return jokes[worstID] if worstID != -1 else None
-
+    """Get the topic students understand best"""
+    topics = _read_topics_file()
+    best = 0
+    best_id = -1
+    for topic in topics:
+        if topic['understand_well'] > best:
+            best = topic['understand_well']
+            best_id = topic['id']
+    return topics[best_id] if best_id != -1 else None
 
 # Atomic vote update with exclusive lock
-def _vote_joke(id, field):
-    JOKES_FILE = get_jokes_file()
-    with open(JOKES_FILE, 'r+') as f:
+def _vote_topic(id, field):
+    TOPICS_FILE = get_topics_file()
+    with open(TOPICS_FILE, 'r+') as f:
         fcntl.flock(f, fcntl.LOCK_EX)
-        jokes = json.load(f)
-        jokes[id][field] += 1
-        # Move file pointer to start before writing updated JSON
+        topics = json.load(f)
+        topics[id][field] += 1
         f.seek(0)
-        json.dump(jokes, f)
-        # Truncate file to remove any leftover data from previous content
+        json.dump(topics, f, indent=2)
         f.truncate()
         fcntl.flock(f, fcntl.LOCK_UN)
-    return jokes[id][field]
+    return topics[id][field]
 
 def addJokeHaHa(id):
-    return _vote_joke(id, 'haha')
+    """Increment 'need_review' count for a topic"""
+    return _vote_topic(id, 'need_review')
 
 def addJokeBooHoo(id):
-    return _vote_joke(id, 'boohoo')
+    """Increment 'understand_well' count for a topic"""
+    return _vote_topic(id, 'understand_well')
 
-def printJoke(joke):
-    print(joke['id'], joke['joke'], "\n", "haha:", joke['haha'], "\n", "boohoo:", joke['boohoo'], "\n")
+def printJoke(topic):
+    """Print topic information"""
+    print(topic['id'], topic['topic'], "\n", 
+          "Need Review:", topic['need_review'], "\n", 
+          "Understand Well:", topic['understand_well'], "\n")
 
 def countJokes():
-    jokes = _read_jokes_file()
-    return len(jokes)
+    """Count total number of topics"""
+    topics = _read_topics_file()
+    return len(topics)
 
 if __name__ == "__main__": 
-    initJokes()  # initialize jokes
+    initJokes()  # initialize topics
     
-    # Most likes and most jeered
-    best = favoriteJoke()
+    # Most needed and best understood
+    most_needed = favoriteJoke()
+    if most_needed:
+        print("Most students need review on:", most_needed['need_review'], "votes")
+        printJoke(most_needed)
+    
+    best = jeeredJoke()
     if best:
-        print("Most liked", best['haha'])
+        print("Best understood topic:", best['understand_well'], "votes")
         printJoke(best)
-    worst = jeeredJoke()
-    if worst:
-        print("Most jeered", worst['boohoo'])
-        printJoke(worst)
     
-    # Random joke
-    print("Random joke")
+    
+    # Random topic
+    print("Random topic:")
     printJoke(getRandomJoke())
     
-    # Count of Jokes
-    print("Jokes Count: " + str(countJokes()))
+    # Count of Topics
+    print("Topics Count: " + str(countJokes()))

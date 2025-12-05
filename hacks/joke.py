@@ -1,14 +1,14 @@
-from flask import Blueprint, jsonify  # jsonify creates an endpoint response object
-from flask_restful import Api, Resource # used for REST API building
-import requests  # used for testing 
+from flask import Blueprint, jsonify
+from flask_restful import Api, Resource
+import requests
 import random
 
-from hacks.jokes import *
+from hacks.jokes import *  # This stays the same!
 
 joke_api = Blueprint('joke_api', __name__,
                    url_prefix='/api/jokes')
 
-# API generator https://flask-restful.readthedocs.io/en/latest/api.html#id1
+
 api = Api(joke_api)
 
 class JokesAPI:
@@ -17,46 +17,60 @@ class JokesAPI:
         def post(self, joke):
             pass
             
-    # getJokes()
+    # getJokes() - returns all topics
     class _Read(Resource):
         def get(self):
             return jsonify(getJokes())
 
-    # getJoke(id)
+    # getJoke(id) - returns specific topic
     class _ReadID(Resource):
         def get(self, id):
             return jsonify(getJoke(id))
 
-    # getRandomJoke()
+    # getRandomJoke() - returns random topic
     class _ReadRandom(Resource):
         def get(self):
             return jsonify(getRandomJoke())
     
-    # getRandomJoke()
+    # countJokes() - returns count
     class _ReadCount(Resource):
         def get(self):
             count = countJokes()
             countMsg = {'count': count}
             return jsonify(countMsg)
+    
+    # favoriteJoke() - returns most needed topic
+    class _ReadFavorite(Resource):
+        def get(self):
+            topic = favoriteJoke()
+            return jsonify(topic) if topic else jsonify({"error": "No data"})
+    
+    # jeeredJoke() - returns best understood topic
+    class _ReadJeered(Resource):
+        def get(self):
+            topic = jeeredJoke()
+            return jsonify(topic) if topic else jsonify({"error": "No data"})
 
-    # put method: addJokeHaHa
+    # PUT method: addJokeHaHa (now votes for "need review")
     class _UpdateLike(Resource):
         def put(self, id):
             addJokeHaHa(id)
             return jsonify(getJoke(id))
 
-    # put method: addJokeBooHoo
+    # PUT method: addJokeBooHoo (now votes for "understand well")
     class _UpdateJeer(Resource):
         def put(self, id):
             addJokeBooHoo(id)
             return jsonify(getJoke(id))
 
-    # building RESTapi resources/interfaces, these routes are added to Web Server
+    # Building RESTapi resources/interfaces
     api.add_resource(_Create, '/create/<string:joke>', '/create/<string:joke>/')
     api.add_resource(_Read, "", '/')
     api.add_resource(_ReadID, '/<int:id>', '/<int:id>/')
     api.add_resource(_ReadRandom, '/random', '/random/')
     api.add_resource(_ReadCount, '/count', '/count/')
+    api.add_resource(_ReadFavorite, '/favorite', '/favorite/')
+    api.add_resource(_ReadJeered, '/jeered', '/jeered/')
     api.add_resource(_UpdateLike, '/like/<int:id>', '/like/<int:id>/')
     api.add_resource(_UpdateJeer, '/jeer/<int:id>', '/jeer/<int:id>/')
 
@@ -64,31 +78,36 @@ if __name__ == "__main__":
     # server = "http://127.0.0.1:5000" # run local
     server = 'https://flask.opencodingsociety.com' # run from web
     url = server + "/api/jokes"
-    responses = []  # responses list
+    responses = []
 
-    # get count of jokes on server
+    # Get count of topics on server
     count_response = requests.get(url+"/count")
     count_json = count_response.json()
     count = count_json['count']
 
-    # update likes/dislikes test sequence
-    num = str(random.randint(0, count-1)) # test a random record
+    # Update votes test sequence
+    num = str(random.randint(0, count-1))
     responses.append(
-        requests.get(url+"/"+num)  # read joke by id
-        ) 
+        requests.get(url+"/"+num)  # read topic by id
+    ) 
     responses.append(
-        requests.put(url+"/like/"+num) # add to like count
-        ) 
+        requests.put(url+"/like/"+num)  # vote "need review"
+    ) 
     responses.append(
-        requests.put(url+"/jeer/"+num) # add to jeer count
-        ) 
+        requests.put(url+"/jeer/"+num)  # vote "understand well"
+    ) 
 
-    # obtain a random joke
+    # Obtain a random topic
     responses.append(
-        requests.get(url+"/random")  # read a random joke
-        ) 
+        requests.get(url+"/random")
+    ) 
+    
+    # Get most needed
+    responses.append(
+        requests.get(url+"/favorite")
+    )
 
-    # cycle through responses
+    # Cycle through responses
     for response in responses:
         print(response)
         try:

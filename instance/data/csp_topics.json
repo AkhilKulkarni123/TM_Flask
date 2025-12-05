@@ -1,0 +1,140 @@
+[
+  {
+    "id": 0,
+    "topic": "Big Idea 1: Creative Development - Collaboration and program development",
+    "need_review": 3,
+    "understand_well": 4
+  },
+  {
+    "id": 1,
+    "topic": "Big Idea 1: Creative Development - Design and testing",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 2,
+    "topic": "Big Idea 2: Data - Binary numbers and data compression",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 3,
+    "topic": "Big Idea 2: Data - Extracting information from data",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 4,
+    "topic": "Big Idea 2: Data - Using programs with data",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 5,
+    "topic": "Big Idea 3: Algorithms and Programming - Variables and assignments",
+    "need_review": 2,
+    "understand_well": 1
+  },
+  {
+    "id": 6,
+    "topic": "Big Idea 3: Algorithms and Programming - Data abstraction (lists)",
+    "need_review": 2,
+    "understand_well": 1
+  },
+  {
+    "id": 7,
+    "topic": "Big Idea 3: Algorithms and Programming - Mathematical expressions",
+    "need_review": 2,
+    "understand_well": 0
+  },
+  {
+    "id": 8,
+    "topic": "Big Idea 3: Algorithms and Programming - Strings",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 9,
+    "topic": "Big Idea 3: Algorithms and Programming - Boolean expressions",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 10,
+    "topic": "Big Idea 3: Algorithms and Programming - Conditionals (if/else)",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 11,
+    "topic": "Big Idea 3: Algorithms and Programming - Loops (iteration)",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 12,
+    "topic": "Big Idea 3: Algorithms and Programming - Functions and procedures",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 13,
+    "topic": "Big Idea 3: Algorithms and Programming - Algorithms",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 14,
+    "topic": "Big Idea 3: Algorithms and Programming - Simulations",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 15,
+    "topic": "Big Idea 4: Computing Systems and Networks - Internet basics",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 16,
+    "topic": "Big Idea 4: Computing Systems and Networks - Fault tolerance and redundancy",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 17,
+    "topic": "Big Idea 4: Computing Systems and Networks - Parallel and distributed computing",
+    "need_review": 1,
+    "understand_well": 0
+  },
+  {
+    "id": 18,
+    "topic": "Big Idea 5: Impact of Computing - Beneficial and harmful effects",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 19,
+    "topic": "Big Idea 5: Impact of Computing - Digital divide",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 20,
+    "topic": "Big Idea 5: Impact of Computing - Bias in computing",
+    "need_review": 0,
+    "understand_well": 1
+  },
+  {
+    "id": 21,
+    "topic": "Big Idea 5: Impact of Computing - Legal and ethical concerns (privacy, intellectual property)",
+    "need_review": 0,
+    "understand_well": 0
+  },
+  {
+    "id": 22,
+    "topic": "Big Idea 5: Impact of Computing - Safe computing and cybersecurity",
+    "need_review": 0,
+    "understand_well": 0
+  }
+]

@@ -6,6 +6,9 @@ from __init__ import app
 from api.jwt_authorize import token_required
 from model.user import User
 from model.github import GitHubUser
+# api/user.py (add near existing endpoints)
+from flask import Blueprint, g, jsonify
+from api.jwt_authorize import token_required
 
 user_api = Blueprint('user_api', __name__,
                    url_prefix='/api')
@@ -821,7 +824,16 @@ class UserAPI:
 
             except Exception as e:
                 return {'message': f'Error creating guest user: {str(e)}'}, 500
-
+            @user_api.route('/user/current', methods=['GET'])
+            @token_required()
+            def get_current_user():
+                """
+                Return the current authenticated user as JSON.
+                This mirrors the /api/id endpoint so existing clients that hit
+                /user/current continue to work.
+                """
+                current_user = g.current_user
+                return jsonify(current_user.read())
     # building RESTapi endpoint
     api.add_resource(_ID, '/id')
     api.add_resource(_BULK, '/users')

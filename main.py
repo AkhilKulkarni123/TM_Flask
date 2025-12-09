@@ -67,12 +67,19 @@ load_dotenv()
 # ============================================================================
 # CORS CONFIGURATION - CRITICAL FIX FOR FRONTEND CONNECTION
 # ============================================================================
-CORS(app, 
-     supports_credentials=True,
-     origins="*",  # UPDATED: Allow all origins for development
-     allow_headers=["Content-Type", "Authorization", "Set-Cookie", "X-Origin"],
-     expose_headers=["Set-Cookie"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "http://localhost:4500",  # your frontend dev server
+        "http://localhost:3000",  # if you serve the snakes socket/FE here
+        "http://localhost:8001",  # same-origin calls (optional but harmless)
+    ],
+    allow_headers=["Content-Type", "Authorization", "X-Origin"],
+    expose_headers=["Set-Cookie"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
+
 
 # ============================================================================
 # APP CONFIGURATION
@@ -148,15 +155,60 @@ def is_safe_url(target):
 def login():
     error = None
     next_page = request.args.get('next', '') or request.form.get('next', '')
+
     if request.method == 'POST':
         user = User.query.filter_by(_uid=request.form['username']).first()
         if user and user.is_password(request.form['password']):
+            # Flask-Login session login
             login_user(user)
+
+            # Safety check on redirect target
             if not is_safe_url(next_page):
                 return abort(400)
-            return redirect(next_page or url_for('index'))
+
+            # --- NEW: also create JWT cookie so /api/id works ---
+            # This matches the logic in api/user.py (_CRUD and _Security)
+            token = jwt.encode(
+                {"_uid": user._uid},
+                current_app.config["SECRET_KEY"],   # use same key as user.py
+                algorithm="HS256"
+            )
+
+            response = redirect(next_page or url_for('index'))
+
+            # Same is_production logic as in api/user.py
+            is_production = not (
+                request.host.startswith('localhost')
+                or request.host.startswith('127.0.0.1')
+            )
+
+            cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+
+            if is_production:
+                response.set_cookie(
+                    cookie_name,
+                    token,
+                    max_age=43200,
+                    secure=True,
+                    httponly=True,
+                    path='/',
+                    samesite='None'
+                )
+            else:
+                response.set_cookie(
+                    cookie_name,
+                    token,
+                    max_age=43200,
+                    secure=False,
+                    httponly=False,
+                    path='/',
+                    samesite='Lax'
+                )
+
+            return response
         else:
             error = 'Invalid username or password.'
+
     return render_template("login.html", error=error, next=next_page)
 
 @app.route('/studytracker')

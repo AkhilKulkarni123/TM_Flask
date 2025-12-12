@@ -40,7 +40,12 @@ from api.microblog_api import microblog_api
 from api.classroom_api import classroom_api
 from hacks.joke import joke_api
 from api.post import post_api
-from api.snakes_game import snakes_game_api  # NEW SNAKES GAME API
+from api.snakes_game import snakes_game_api  # existing SNAKES GAME API
+from api.study import study_api
+from api.feedback_api import feedback_api
+
+# 🔹 NEW: import the extended Snakes & Ladders blueprint
+from api.snakes_extended import snakes_bp
 
 # database Initialization functions
 from model.user import User, initUsers
@@ -48,14 +53,13 @@ from model.user import Section
 from model.github import GitHubUser
 from model.feedback import Feedback
 from api.analytics import get_date_range
-from api.study import study_api
-from api.feedback_api import feedback_api
 from model.study import Study, initStudies
 from model.classroom import Classroom
 from model.post import Post, init_posts
 from model.microblog import MicroBlog, Topic, init_microblogs
 from hacks.jokes import initJokes
-from model.snakes_game import SnakesGameData, initSnakesGame  # NEW SNAKES GAME MODEL
+# 🔹 CHANGED: only import SnakesGameData, not initSnakesGame
+from model.snakes_game import SnakesGameData  # NEW SNAKES GAME MODEL
 
 # server only Views
 import os
@@ -79,7 +83,6 @@ CORS(
     expose_headers=["Set-Cookie"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 )
-
 
 # ============================================================================
 # APP CONFIGURATION
@@ -113,7 +116,10 @@ app.register_blueprint(post_api)
 app.register_blueprint(game_api)
 app.register_blueprint(boss_api)
 app.register_blueprint(admin_api)
-app.register_blueprint(snakes_game_api)  # NEW SNAKES GAME BLUEPRINT
+app.register_blueprint(snakes_game_api)  # existing Snakes game blueprint
+
+# 🔹 NEW: register the extended Snakes AP CSP blueprint (under /api/snakes)
+app.register_blueprint(snakes_bp)
 
 # ============================================================================
 # DATABASE INITIALIZATION
@@ -121,7 +127,8 @@ app.register_blueprint(snakes_game_api)  # NEW SNAKES GAME BLUEPRINT
 # Jokes file initialization
 with app.app_context():
     initJokes()
-    initSnakesGame()  # NEW SNAKES GAME INITIALIZATION
+    # 🔹 CHANGED: call the class method instead of missing function
+    SnakesGameData.initSnakesGame()  # NEW SNAKES GAME INITIALIZATION
 
 # ============================================================================
 # FLASK-LOGIN CONFIGURATION
@@ -168,6 +175,7 @@ def login():
 
             # --- NEW: also create JWT cookie so /api/id works ---
             # This matches the logic in api/user.py (_CRUD and _Security)
+            import jwt  # local import to avoid global dependency if unused
             token = jwt.encode(
                 {"_uid": user._uid},
                 current_app.config["SECRET_KEY"],   # use same key as user.py
@@ -420,7 +428,8 @@ custom_cli = AppGroup('custom', help='Custom commands')
 def generate_data():
     initUsers()
     init_microblogs()
-    initSnakesGame()  # NEW
+    # 🔹 CHANGED: call class method instead of missing function
+    SnakesGameData.initSnakesGame()  # NEW
 
 app.cli.add_command(custom_cli)
 

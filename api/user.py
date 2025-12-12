@@ -93,10 +93,7 @@ class UserAPI:
             if uid is None or len(uid) < 2:
                 return {'message': f'User ID is missing, or is less than 2 characters'}, 400
           
-            # check if uid is a GitHub account
-            _, status = GitHubUser().get(uid)
-            if status != 200:
-                return {'message': f'User ID {uid} not a valid GitHub account' }, 404
+            # Note: GitHub validation has been removed - uid is still required but doesn't need to be a valid GitHub account
             
             ''' User object creation '''
             #1: Setup minimal User object using __init__ method
@@ -286,11 +283,7 @@ class UserAPI:
                 # Non-admin can only update themselves
                 user = current_user
                 
-            # Accounts are desired to be GitHub accounts, change must be validated 
-            if body.get('uid') and body.get('uid') != user._uid:
-                _, status = GitHubUser().get(body.get('uid'))
-                if status != 200:
-                    return {'message': f'User ID {body.get("uid")} not a valid GitHub account' }, 404
+            # Note: GitHub validation has been removed for updates as well
             
             # Update the User object to the database using custom update method
             user.update(body)
@@ -824,23 +817,25 @@ class UserAPI:
 
             except Exception as e:
                 return {'message': f'Error creating guest user: {str(e)}'}, 500
-            @user_api.route('/user/current', methods=['GET'])
-            @token_required()
-            def get_current_user():
-                """
-                Return the current authenticated user as JSON.
-                This mirrors the /api/id endpoint so existing clients that hit
-                /user/current continue to work.
-                """
-                current_user = g.current_user
-                return jsonify(current_user.read())
-    # building RESTapi endpoint
-    api.add_resource(_ID, '/id')
-    api.add_resource(_BULK, '/users')
-    api.add_resource(_CRUD, '/user')
-    api.add_resource(_GuestCRUD, '/user/guest')
-    api.add_resource(_Section, '/user/section')
-    api.add_resource(_Security, '/authenticate')
-    api.add_resource(_GradeData, '/grade_data')
-    api.add_resource(_APExam, '/apexam')
-    api.add_resource(_School, '/school')
+
+@user_api.route('/user/current', methods=['GET'])
+@token_required()
+def get_current_user():
+    """
+    Return the current authenticated user as JSON.
+    This mirrors the /api/id endpoint so existing clients that hit
+    /user/current continue to work.
+    """
+    current_user = g.current_user
+    return jsonify(current_user.read())
+
+# building RESTapi endpoint
+api.add_resource(UserAPI._ID, '/id')
+api.add_resource(UserAPI._BULK, '/users')
+api.add_resource(UserAPI._CRUD, '/user')
+api.add_resource(UserAPI._GuestCRUD, '/user/guest')
+api.add_resource(UserAPI._Section, '/user/section')
+api.add_resource(UserAPI._Security, '/authenticate')
+api.add_resource(UserAPI._GradeData, '/grade_data')
+api.add_resource(UserAPI._APExam, '/apexam')
+api.add_resource(UserAPI._School, '/school')

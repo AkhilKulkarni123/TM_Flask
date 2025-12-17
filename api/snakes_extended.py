@@ -16,6 +16,10 @@ from model.snakes_game import SnakesGameData
 
 snakes_bp = Blueprint('snakes_bp', __name__, url_prefix='/api/snakes')
 
+# Board configuration (1-based indexing)
+QUESTION_SECTION_MIN_SQUARE = 7   # section 2 begins at board square 6 (0-based)
+QUESTION_SECTION_MAX_SQUARE = 56  # section 2 ends at board square 55 (0-based)
+
 
 @snakes_bp.route('/progress', methods=['GET'])
 @token_required()
@@ -78,7 +82,11 @@ def answer_question():
         bullets_earned = data.get('bullets_earned', 0)
         correct = bool(data.get('correct'))
         # Validate square
-        if not isinstance(square, int) or square < 26 or square > 50:
+        if (
+            not isinstance(square, int)
+            or square < QUESTION_SECTION_MIN_SQUARE
+            or square > QUESTION_SECTION_MAX_SQUARE
+        ):
             return jsonify({'error': 'Invalid square number'}), 400
         record = SnakesGameData.query.filter_by(user_id=user.id).first()
         if not record:
@@ -91,7 +99,7 @@ def answer_question():
         if correct:
             record.total_bullets += bullets_earned
         # Unlock boss battle when reaching square 50
-        if square >= 50 and 'boss' not in record.unlocked_sections:
+        if square >= QUESTION_SECTION_MAX_SQUARE and 'boss' not in record.unlocked_sections:
             record.unlocked_sections.append('boss')
         db.session.commit()
         return jsonify({

@@ -1,7 +1,7 @@
 # imports from flask
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse
-from flask import abort, redirect, render_template, request, send_from_directory, url_for, jsonify, current_app, g
+from flask import abort, redirect, render_template, request, send_from_directory, url_for, jsonify, current_app, g, make_response
 from flask_login import current_user, login_user, logout_user
 from flask.cli import AppGroup
 from flask_login import current_user, login_required
@@ -16,6 +16,7 @@ from flask import Flask, request, make_response, jsonify
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
+import jwt
 
 # import API blueprints
 from api.game import game_api
@@ -69,15 +70,15 @@ import requests
 load_dotenv()
 
 # ============================================================================
-# CORS CONFIGURATION - CRITICAL FIX FOR FRONTEND CONNECTION
+# CORS CONFIGURATION
 # ============================================================================
 CORS(
     app,
     supports_credentials=True,
     origins=[
-        "http://localhost:4500",  # your frontend dev server
-        "http://localhost:3000",  # if you serve the snakes socket/FE here
-        "http://localhost:8001",  # same-origin calls (optional but harmless)
+        "http://localhost:4500",
+        "http://localhost:3000",
+        "http://localhost:8001",
     ],
     allow_headers=["Content-Type", "Authorization", "X-Origin"],
     expose_headers=["Set-Cookie"],
@@ -93,6 +94,48 @@ app.config['KASM_API_KEY_SECRET'] = os.getenv('KASM_API_KEY_SECRET')
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-this')
 app.config['DEFAULT_PASSWORD'] = os.getenv('DEFAULT_PASSWORD', '123Qwerty!')
+
+# ============================================================================
+# STATIC FILE SERVING - SERVE JEKYLL BUILD FROM FLASK
+# ============================================================================
+
+@app.route('/game/questions/questions.html')
+def serve_questions():
+    """Serve questions page from _includes/tailwind"""
+    questions_dir = os.path.join(app.root_path, '..', 'frontend', '_includes', 'tailwind')
+    return send_from_directory(questions_dir, 'questions.html')
+
+@app.route('/js/questions_bank.js')
+def serve_questions_bank():
+    """Serve questions bank JS"""
+    # Try _site first (Jekyll build location)
+    js_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'hacks', 'snakes', 'questions')
+    return send_from_directory(js_dir, 'questions_bank.js')
+
+@app.route('/game/<path:filename>')
+def serve_game(filename):
+    """Serve game files from Jekyll build directory"""
+    # Adjust this path to match your Jekyll _site output directory
+    jekyll_build_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'game')
+    return send_from_directory(jekyll_build_dir, filename)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    """Serve JavaScript files"""
+    jekyll_build_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'js')
+    return send_from_directory(jekyll_build_dir, filename)
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    """Serve CSS files"""
+    jekyll_build_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'css')
+    return send_from_directory(jekyll_build_dir, filename)
+
+@app.route('/assets/<path:filename>')
+def serve_assets(filename):
+    """Serve asset files"""
+    jekyll_build_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'assets')
+    return send_from_directory(jekyll_build_dir, filename)
 
 # ============================================================================
 # REGISTER API BLUEPRINTS
@@ -116,7 +159,7 @@ app.register_blueprint(post_api)
 app.register_blueprint(game_api)
 app.register_blueprint(boss_api)
 app.register_blueprint(admin_api)
-app.register_blueprint(snakes_game_api)  # existing Snakes game blueprint
+app.register_blueprint(snakes_game_api)
 
 # 🔹 NEW: register the extended Snakes AP CSP blueprint (under /api/snakes)
 app.register_blueprint(snakes_bp)
@@ -124,23 +167,22 @@ app.register_blueprint(snakes_bp)
 # ============================================================================
 # DATABASE INITIALIZATION
 # ============================================================================
-# Jokes file initialization
+
 with app.app_context():
     initJokes()
-    # 🔹 CHANGED: call the class method instead of missing function
-    SnakesGameData.initSnakesGame()  # NEW SNAKES GAME INITIALIZATION
+    SnakesGameData.initSnakesGame()
 
 # ============================================================================
 # FLASK-LOGIN CONFIGURATION
 # ============================================================================
-# Tell Flask-Login the view function name of your login route
+
 login_manager.login_view = "login"
 
 @login_manager.unauthorized_handler
 def unauthorized_callback():
     return redirect(url_for('login', next=request.path))
 
-# register URIs for server pages
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -150,9 +192,30 @@ def inject_user():
     return dict(current_user=current_user)
 
 # ============================================================================
-# AUTHENTICATION ROUTES (SERVER-SIDE HTML)
+# JWT COOKIE HELPER
 # ============================================================================
-# Helper function to check if the URL is safe for redirects
+
+def set_jwt_cookie(response, token):
+    """Centralized JWT cookie setting logic"""
+    cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    
+    # Always use permissive settings for localhost development
+    response.set_cookie(
+        cookie_name,
+        token,
+        max_age=43200,  # 12 hours
+        secure=False,   # CRITICAL: Must be False for localhost HTTP
+        httponly=False, # Allow JS access for debugging
+        path='/',       # Available to all paths
+        samesite='Lax'  # Lax allows same-site navigation
+    )
+    print(f"✅ JWT cookie '{cookie_name}' set successfully")
+    return response
+
+# ============================================================================
+# AUTHENTICATION ROUTES
+# ============================================================================
+
 def is_safe_url(target):
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
@@ -167,55 +230,31 @@ def login():
         user = User.query.filter_by(_uid=request.form['username']).first()
         if user and user.is_password(request.form['password']):
             # Flask-Login session login
-            login_user(user)
+            login_user(user, remember=True, duration=timedelta(hours=12))
 
             # Safety check on redirect target
             if not is_safe_url(next_page):
                 return abort(400)
 
-            # --- NEW: also create JWT cookie so /api/id works ---
-            # This matches the logic in api/user.py (_CRUD and _Security)
-            import jwt  # local import to avoid global dependency if unused
+            # Create JWT token
             token = jwt.encode(
-                {"_uid": user._uid},
-                current_app.config["SECRET_KEY"],   # use same key as user.py
+                {
+                    "_uid": user._uid,
+                    "role": user.role,
+                    "exp": datetime.utcnow() + timedelta(hours=12)
+                },
+                current_app.config["SECRET_KEY"],
                 algorithm="HS256"
             )
 
-            response = redirect(next_page or url_for('index'))
-
-            # Same is_production logic as in api/user.py
-            is_production = not (
-                request.host.startswith('localhost')
-                or request.host.startswith('127.0.0.1')
-            )
-
-            cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
-
-            if is_production:
-                response.set_cookie(
-                    cookie_name,
-                    token,
-                    max_age=43200,
-                    secure=True,
-                    httponly=True,
-                    path='/',
-                    samesite='None'
-                )
-            else:
-                response.set_cookie(
-                    cookie_name,
-                    token,
-                    max_age=43200,
-                    secure=False,
-                    httponly=False,
-                    path='/',
-                    samesite='Lax'
-                )
-
+            response = make_response(redirect(next_page or url_for('index')))
+            set_jwt_cookie(response, token)
+            
+            print(f"✅ User {user._uid} logged in successfully")
             return response
         else:
             error = 'Invalid username or password.'
+            print(f"❌ Login failed for username: {request.form.get('username')}")
 
     return render_template("login.html", error=error, next=next_page)
 
@@ -226,11 +265,16 @@ def studytracker():
 @app.route('/logout')
 def logout():
     logout_user()
-    return redirect(url_for('index'))
+    response = make_response(redirect(url_for('index')))
+    # Clear JWT cookie
+    cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    response.set_cookie(cookie_name, '', expires=0)
+    return response
 
 # ============================================================================
 # API HEALTH CHECK & ROOT
 # ============================================================================
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """API health check endpoint"""
@@ -257,9 +301,10 @@ def api_root():
 # ============================================================================
 # ERROR HANDLERS
 # ============================================================================
+
 @app.errorhandler(404)
 def page_not_found(e):
-    # Check if it's an API request
+    
     if request.path.startswith('/api/'):
         return jsonify({'error': 'API endpoint not found'}), 404
     return render_template('404.html'), 404
@@ -273,6 +318,7 @@ def internal_error(e):
 # ============================================================================
 # SERVER-SIDE HTML ROUTES
 # ============================================================================
+
 @app.route('/')
 def index():
     print("Home:", current_user)
@@ -295,8 +341,20 @@ def uploaded_file(filename):
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 # ============================================================================
+# GAME ROUTES
+# ============================================================================
+
+@app.route('/game-board')
+@login_required
+def game_board():
+    """Serve the main game board - requires login"""
+    jekyll_build_dir = os.path.join(app.root_path, '..', 'frontend', '_site', 'game')
+    return send_from_directory(jekyll_build_dir, 'game-board-part2.html')
+
+# ============================================================================
 # USER MANAGEMENT ROUTES
 # ============================================================================
+
 @app.route('/users/delete/<int:user_id>', methods=['DELETE'])
 @login_required
 def delete_user(user_id):
@@ -340,6 +398,7 @@ def update_user(uid):
 # ============================================================================
 # KASM INTEGRATION ROUTES
 # ============================================================================
+
 @app.route('/kasm_users')
 def kasm_users():
     SERVER = current_app.config.get('KASM_SERVER')
@@ -421,24 +480,28 @@ def delete_user_kasm(user_id):
 # ============================================================================
 # CLI COMMANDS
 # ============================================================================
-# Create an AppGroup for custom commands
+
 custom_cli = AppGroup('custom', help='Custom commands')
 
 @custom_cli.command('generate_data')
 def generate_data():
     initUsers()
     init_microblogs()
-    # 🔹 CHANGED: call class method instead of missing function
-    SnakesGameData.initSnakesGame()  # NEW
+    SnakesGameData.initSnakesGame()
 
 app.cli.add_command(custom_cli)
 
 # ============================================================================
 # RUN APPLICATION
 # ============================================================================
+
 if __name__ == "__main__":
     host = "0.0.0.0"
     port = int(os.getenv('FLASK_PORT', 8001))
-    print(f"** Server running: http://localhost:{port}")
-    print(f"** API endpoints available at: http://localhost:{port}/api")
+    print(f"\n{'='*60}")
+    print(f"🚀 Server running: http://localhost:{port}")
+    print(f"📡 API endpoints: http://localhost:{port}/api")
+    print(f"🎮 Game board: http://localhost:{port}/game-board")
+    print(f"🔐 Login: http://localhost:{port}/login")
+    print(f"{'='*60}\n")
     app.run(debug=True, host=host, port=port, use_reloader=False)

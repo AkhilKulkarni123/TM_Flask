@@ -101,7 +101,15 @@ app.config['DEFAULT_PASSWORD'] = os.getenv('DEFAULT_PASSWORD', '123Qwerty!')
 
 @app.route('/game/questions/questions.html')
 def serve_questions():
-    """Serve questions page from _includes/tailwind"""
+    """Serve questions page - ensure user is authenticated"""
+    # Check if user has valid JWT
+    cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    token = request.cookies.get(cookie_name)
+    
+    if not token and not current_user.is_authenticated:
+        # Redirect to login if no valid session
+        return redirect(url_for('login', next=request.path))
+    
     questions_dir = os.path.join(app.root_path, '..', 'frontend', '_includes', 'tailwind')
     return send_from_directory(questions_dir, 'questions.html')
 
@@ -199,15 +207,16 @@ def set_jwt_cookie(response, token):
     """Centralized JWT cookie setting logic"""
     cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
     
-    # Always use permissive settings for localhost development
+    # FIXED: More permissive settings for localhost
     response.set_cookie(
         cookie_name,
         token,
         max_age=43200,  # 12 hours
-        secure=False,   # CRITICAL: Must be False for localhost HTTP
-        httponly=False, # Allow JS access for debugging
+        secure=False,   # Must be False for HTTP localhost
+        httponly=False, # CRITICAL: Allow JavaScript access
         path='/',       # Available to all paths
-        samesite='Lax'  # Lax allows same-site navigation
+        samesite='None' if request.is_secure else 'Lax',  # Lax for localhost
+        domain=None     # No domain restriction for localhost
     )
     print(f"✅ JWT cookie '{cookie_name}' set successfully")
     return response
@@ -298,6 +307,46 @@ def api_root():
         }
     }), 200
 
+@app.route('/api/authenticate', methods=['POST'])
+def authenticate():
+    """Alternative authentication endpoint that returns user data"""
+    try:
+        # Try to get JWT from cookie
+        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+        token = request.cookies.get(cookie_name)
+        
+        if not token:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        # Verify JWT
+        try:
+            payload = jwt.decode(
+                token,
+                current_app.config["SECRET_KEY"],
+                algorithms=["HS256"]
+            )
+            
+            # Get user from database
+            user = User.query.filter_by(_uid=payload['_uid']).first()
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            return jsonify({
+                'id': user.id,
+                'uid': user._uid,
+                'name': user._name,
+                'role': user.role
+            }), 200
+            
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
+            
+    except Exception as e:
+        print(f"❌ Authentication error: {str(e)}")
+        return jsonify({'error': 'Authentication failed'}), 500
+    
 # ============================================================================
 # ERROR HANDLERS
 # ============================================================================

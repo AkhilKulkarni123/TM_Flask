@@ -78,7 +78,7 @@ CORS(
     origins=[
         "http://localhost:4500",
         "http://localhost:3000",
-        "http://localhost:8301",
+        "http://localhost:8306",
     ],
     allow_headers=["Content-Type", "Authorization", "X-Origin"],
     expose_headers=["Set-Cookie"],
@@ -546,11 +546,11 @@ app.cli.add_command(custom_cli)
 
 if __name__ == "__main__":
     host = "0.0.0.0"
-    port = int(os.getenv('FLASK_PORT', 8301))
+    port = int(os.getenv('FLASK_PORT', 8306))
     print(f"\n{'='*60}")
-    print(f"🚀 Server running: http://localhost:{8301}")
-    print(f"📡 API endpoints: http://localhost:{8301}/api")
-    print(f"🎮 Game board: http://localhost:{8301}/game-board")
-    print(f"🔐 Login: http://localhost:{8301}/login")
+    print(f"🚀 Server running: http://localhost:{8306}")
+    print(f"📡 API endpoints: http://localhost:{8306}/api")
+    print(f"🎮 Game board: http://localhost:{8306}/game-board")
+    print(f"🔐 Login: http://localhost:{8306}/login")
     print(f"{'='*60}\n")
-    app.run(debug=True, host="0.0.0.0", port=8301, use_reloader=False)
+    app.run(debug=True, host="0.0.0.0", port=8306, use_reloader=False)

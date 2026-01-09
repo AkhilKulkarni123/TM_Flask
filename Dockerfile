@@ -5,7 +5,7 @@ FROM docker.io/python:3.11
 WORKDIR /app
 
 # Install system dependencies and clean up apt cache
-RUN apt-get update && apt-get install -y --no-install-recommends && \
+RUN apt-get update && apt-get install -y && \
     git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
     

@@ -8,7 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends && \
     git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-    apt-get install -y python3 python3-pip git
+    
 
 # Copy application code into the container
 COPY . /app

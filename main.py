@@ -78,7 +78,7 @@ CORS(
     origins=[
         "http://localhost:4500",
         "http://localhost:3000",
-        "http://localhost:8001",
+        "http://localhost:8301",
     ],
     allow_headers=["Content-Type", "Authorization", "X-Origin"],
     expose_headers=["Set-Cookie"],

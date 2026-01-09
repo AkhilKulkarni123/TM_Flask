@@ -61,7 +61,7 @@ pip install -r requirements.txt
 
   ```shell
   # Port configuration
-  FLASK_PORT=8001
+  FLASK_PORT=8301
   # Admin user reset password 
   DEFAULT_PASSWORD='123Qwerty!'
   # Admin user defaults

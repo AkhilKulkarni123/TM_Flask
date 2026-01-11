@@ -161,9 +161,20 @@ class GetUnvisitedSquaresAPI(Resource):
         }, 200
 
 
+class ActivePlayersAPI(Resource):
+    def get(self):
+        """Get count of all players who have started the game"""
+        total_players = SnakesGameData.query.count()
+        return {
+            "active_players": total_players,
+            "message": "Total players who have joined the game"
+        }, 200
+
+
 api.add_resource(SnakesGameAPI, "/")
 api.add_resource(LeaderboardAPI, "/leaderboard")
 api.add_resource(AddBulletsAPI, "/add-bullets")
 api.add_resource(UpdateSquareAPI, "/update-square")
 api.add_resource(ResetPositionAPI, "/reset-position")
 api.add_resource(GetUnvisitedSquaresAPI, "/unvisited-squares")
+api.add_resource(ActivePlayersAPI, "/active-players")

@@ -5,8 +5,8 @@ from flask import Flask
 app = Flask(__name__)
 
 socketio = SocketIO(app, cors_allowed_origins=[
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    "http://localhost:8306",
+    "http://127.0.0.1:8306",
     "https://open-coding-society.github.io",
     "https://pages.opencodingsociety.com",
 ])
@@ -49,4 +49,4 @@ def handle_get_leaderboard():
 # this runs the flask application on the development server
 if __name__ == "__main__":
     # change name for testing
-    socketio.run(app, debug=True, host="0.0.0.0", port=8500)
+    socketio.run(app, debug=True, host="0.0.0.0", port=8306)

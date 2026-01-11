@@ -76,9 +76,8 @@ CORS(
     app,
     supports_credentials=True,
     origins=[
-        "http://localhost:4500",
-        "http://localhost:3000",
         "http://localhost:8306",
+        "http://127.0.0.1:8306",
     ],
     allow_headers=["Content-Type", "Authorization", "X-Origin"],
     expose_headers=["Set-Cookie"],

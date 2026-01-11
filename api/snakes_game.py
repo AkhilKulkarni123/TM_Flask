@@ -1,5 +1,6 @@
 from flask import Blueprint, request, g
 from flask_restful import Api, Resource
+from datetime import datetime, timedelta
 from model.snakes_game import SnakesGameData
 from __init__ import db
 from api.jwt_authorize import token_required
@@ -163,11 +164,15 @@ class GetUnvisitedSquaresAPI(Resource):
 
 class ActivePlayersAPI(Resource):
     def get(self):
-        """Get count of all players who have started the game"""
-        total_players = SnakesGameData.query.count()
+        """Get count of players actively playing (updated within last 5 minutes)"""
+        # Only count players who have made movements/changes in the last 5 minutes
+        active_threshold = datetime.utcnow() - timedelta(minutes=5)
+        active_players = SnakesGameData.query.filter(
+            SnakesGameData.last_updated >= active_threshold
+        ).count()
         return {
-            "active_players": total_players,
-            "message": "Total players who have joined the game"
+            "active_players": active_players,
+            "message": "Players actively playing (updated in last 5 minutes)"
         }, 200
 
 

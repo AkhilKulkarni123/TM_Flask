@@ -164,15 +164,29 @@ class GetUnvisitedSquaresAPI(Resource):
 
 class ActivePlayersAPI(Resource):
     def get(self):
-        """Get count of players actively playing (updated within last 5 minutes)"""
-        # Only count players who have made movements/changes in the last 5 minutes
-        active_threshold = datetime.utcnow() - timedelta(minutes=5)
-        active_players = SnakesGameData.query.filter(
+        """Get count and list of players actively playing (updated within last 10 seconds)"""
+        # Only count players who have made movements/changes in the last 10 seconds
+        active_threshold = datetime.utcnow() - timedelta(seconds=10)
+        active_players_query = SnakesGameData.query.filter(
             SnakesGameData.last_updated >= active_threshold
-        ).count()
+        ).order_by(SnakesGameData.last_updated.desc()).all()
+
+        # Build list of active players with relevant info
+        players_list = []
+        for player in active_players_query:
+            players_list.append({
+                "user_id": player.user_id,
+                "username": player.username,
+                "selected_character": player.selected_character,
+                "current_square": player.current_square,
+                "total_bullets": player.total_bullets,
+                "last_updated": player.last_updated.isoformat() if player.last_updated else None
+            })
+
         return {
-            "active_players": active_players,
-            "message": "Players actively playing (updated in last 5 minutes)"
+            "active_players": len(players_list),
+            "players": players_list,
+            "message": "Players actively playing (updated in last 10 seconds)"
         }, 200
 
 

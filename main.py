@@ -76,6 +76,7 @@ CORS(
     app,
     supports_credentials=True,
     origins=[
+        # Local development
         "http://localhost:8306",
         "http://127.0.0.1:8306",
         "http://localhost:4500",
@@ -84,9 +85,11 @@ CORS(
         "http://127.0.0.1:4600",
         "http://localhost:4000",
         "http://127.0.0.1:4000",
+        # Production deployments
         "https://open-coding-society.github.io",
         "https://pages.opencodingsociety.com",
         "https://akhilkulkarni123.github.io",
+        "https://snakes.opencodingsociety.com",
     ],
     allow_headers=["Content-Type", "Authorization", "X-Origin"],
     expose_headers=["Set-Cookie"],
@@ -214,19 +217,34 @@ def inject_user():
 def set_jwt_cookie(response, token):
     """Centralized JWT cookie setting logic"""
     cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
-    
-    # FIXED: More permissive settings for localhost
-    response.set_cookie(
-        cookie_name,
-        token,
-        max_age=43200,  # 12 hours
-        secure=False,   # Must be False for HTTP localhost
-        httponly=False, # CRITICAL: Allow JavaScript access
-        path='/',       # Available to all paths
-        samesite='None' if request.is_secure else 'Lax',  # Lax for localhost
-        domain=None     # No domain restriction for localhost
-    )
-    print(f"✅ JWT cookie '{cookie_name}' set successfully")
+
+    # Detect if running in production or development
+    is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+
+    if is_production:
+        # Production: secure cookies for cross-domain HTTPS
+        response.set_cookie(
+            cookie_name,
+            token,
+            max_age=43200,  # 12 hours
+            secure=True,    # Required for HTTPS
+            httponly=True,  # Prevent XSS access
+            path='/',
+            samesite='None' # Required for cross-domain cookies
+        )
+    else:
+        # Development: permissive settings for localhost
+        response.set_cookie(
+            cookie_name,
+            token,
+            max_age=43200,  # 12 hours
+            secure=False,   # Allow HTTP for localhost
+            httponly=False, # Allow JavaScript access for debugging
+            path='/',
+            samesite='Lax'  # Default for same-site requests
+        )
+
+    print(f"✅ JWT cookie '{cookie_name}' set successfully (production={is_production})")
     return response
 
 # ============================================================================

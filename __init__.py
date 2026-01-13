@@ -22,23 +22,8 @@ app.config['JSON_AS_ASCII'] = False  # Allow emojis, non-ASCII characters in JSO
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Allowed servers for cross-origin resource sharing (CORS)
-cors = CORS(
-   app,
-   supports_credentials=True,
-   origins=[
-       'http://localhost:4500',
-       'http://127.0.0.1:4500',
-       'http://localhost:4600',
-       'http://127.0.0.1:4600',
-       'http://localhost:4000',
-       'http://127.0.0.1:4000',
-       'https://open-coding-society.github.io',
-       'https://pages.opencodingsociety.com',
-       'https://akhilkulkarni123.github.io',
-   ],
-   methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-)
+# NOTE: CORS is configured in main.py with full settings
+# Do not initialize CORS here to avoid duplicate configuration
 
 # Admin Defaults
 app.config['ADMIN_USER'] = os.environ.get('ADMIN_USER') or 'Admin Name'

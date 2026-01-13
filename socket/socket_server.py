@@ -7,8 +7,11 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins=[
     "http://localhost:8306",
     "http://127.0.0.1:8306",
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
     "https://open-coding-society.github.io",
     "https://pages.opencodingsociety.com",
+    "https://akhilkulkarni123.github.io",
 ])
 
 

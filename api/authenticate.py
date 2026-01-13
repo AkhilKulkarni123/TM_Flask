@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, current_app
 from flask_restful import Api, Resource
 from model.user import User
 import jwt
@@ -10,6 +10,38 @@ authenticate_api = Blueprint('authenticate_api', __name__, url_prefix='/api')
 api = Api(authenticate_api)
 
 SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-this')
+
+def set_jwt_cookie(response, token):
+    """Centralized JWT cookie setting logic for cross-origin support"""
+    cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    
+    # Detect if running in production or development
+    is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+    
+    if is_production:
+        # Production: secure cookies for cross-domain HTTPS
+        response.set_cookie(
+            cookie_name,
+            token,
+            max_age=86400,  # 24 hours
+            secure=True,    # Required for HTTPS
+            httponly=True,  # Prevent XSS access
+            path='/',
+            samesite='None' # Required for cross-domain cookies
+        )
+    else:
+        # Development: permissive settings for localhost
+        response.set_cookie(
+            cookie_name,
+            token,
+            max_age=86400,  # 24 hours
+            secure=False,   # Allow HTTP for localhost
+            httponly=False, # Allow JavaScript access for debugging
+            path='/',
+            samesite='Lax'  # Default for same-site requests
+        )
+    
+    return response
 
 def token_required(f):
     """Decorator to require valid JWT token"""
@@ -84,15 +116,8 @@ class Authenticate(Resource):
                 'token': token
             }), 200)
             
-            # Set cookie
-            response.set_cookie(
-                'jwt',
-                token,
-                max_age=86400,  # 24 hours
-                secure=False,  # Set to True in production with HTTPS
-                httponly=True,
-                samesite='Lax'
-            )
+            # Set cookie with proper cross-origin settings
+            set_jwt_cookie(response, token)
             
             return response
             
@@ -115,8 +140,9 @@ class Logout(Resource):
     """User logout"""
     
     def post(self):
+        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
         response = make_response(jsonify({'message': 'Logout successful'}), 200)
-        response.set_cookie('jwt', '', max_age=0)
+        response.set_cookie(cookie_name, '', max_age=0, path='/')
         return response
 
 # Register endpoints

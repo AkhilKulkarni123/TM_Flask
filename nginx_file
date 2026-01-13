@@ -3,13 +3,25 @@
       listen [::]:8306;
       server_name snakes.opencodingsociety.com;
 
+      # Map to dynamically set allowed origin based on request
+      set $cors_origin "";
+      if ($http_origin = "https://akhilkulkarni123.github.io") {
+          set $cors_origin $http_origin;
+      }
+      if ($http_origin = "https://open-coding-society.github.io") {
+          set $cors_origin $http_origin;
+      }
+      if ($http_origin = "https://pages.opencodingsociety.com") {
+          set $cors_origin $http_origin;
+      }
+
       location / {
           proxy_pass http://localhost:8306;
 
           # Preflighted requests
           if ($request_method = OPTIONS) {
               add_header "Access-Control-Allow-Credentials" "true" always;
-              add_header "Access-Control-Allow-Origin"  "https://open-coding-society.github.io" always;
+              add_header "Access-Control-Allow-Origin" $cors_origin always;
               add_header "Access-Control-Allow-Methods" "GET, POST, PUT, DELETE, OPTIONS, HEAD" always;
               add_header "Access-Control-Allow-MaxAge" 600 always;
               add_header "Access-Control-Allow-Headers" "Authorization, Origin, X-Origin, X-Requested-With, Content-Type, Accept" always;

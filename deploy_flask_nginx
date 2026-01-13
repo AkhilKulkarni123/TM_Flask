@@ -26,6 +26,9 @@ server {
         if ($http_origin = "https://open-coding-society.github.io") {
             set $cors_origin $http_origin;
         }
+        if ($http_origin = "https://akhilkulkarni123.github.io") {
+            set $cors_origin $http_origin;
+        }
 
         add_header "Access-Control-Allow-Origin" "$cors_origin" always;
         add_header "Access-Control-Allow-Credentials" "true" always;

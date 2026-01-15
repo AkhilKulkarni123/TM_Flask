@@ -16,6 +16,30 @@ user_api = Blueprint('user_api', __name__,
 # API docs https://flask-restful.readthedocs.io/en/latest/api.html
 api = Api(user_api)
 
+def is_production_request():
+    """Check if this is a production request by examining headers and scheme.
+    
+    When behind nginx proxy, request.host may show localhost, so we check:
+    1. X-Forwarded-Proto header (set by nginx for HTTPS)
+    2. Request scheme
+    3. Host header as fallback
+    """
+    # Check X-Forwarded-Proto header (nginx sets this for HTTPS)
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+    if forwarded_proto == 'https':
+        return True
+    
+    # Check request scheme
+    if request.scheme == 'https':
+        return True
+    
+    # Fallback: check host (for direct access without proxy)
+    host = request.host.lower()
+    if not (host.startswith('localhost') or host.startswith('127.0.0.1')):
+        return True
+    
+    return False
+
 class UserAPI:        
     class _ID(Resource):  # Individual identification API operation
         @token_required()
@@ -153,7 +177,7 @@ class UserAPI:
                         }), 200)
                         
                         # Set cookie
-                        is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                        is_production = is_production_request()
                         if is_production:
                             response.set_cookie(
                                 current_app.config.get("JWT_TOKEN_NAME", "jwt"),
@@ -195,7 +219,7 @@ class UserAPI:
                 }), 200)
                 
                 # Set cookie
-                is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                is_production = is_production_request()
                 if is_production:
                     response.set_cookie(
                         current_app.config.get("JWT_TOKEN_NAME", "jwt"),
@@ -424,7 +448,7 @@ class UserAPI:
                             algorithm="HS256"
                         )
                         # Return JSON response with cookie
-                        is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                        is_production = is_production_request()
                         
                         # Create JSON response
                         response_data = {
@@ -491,7 +515,7 @@ class UserAPI:
                 
                 # Prepare a response indicating the token has been invalidated
                 resp = Response("Token invalidated successfully")
-                is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                is_production = is_production_request()
                 cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
                 if is_production:
                     resp.set_cookie(
@@ -749,7 +773,7 @@ class UserAPI:
                         }), 200)
                         
                         # Set cookie
-                        is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                        is_production = is_production_request()
                         cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
                         if is_production:
                             response.set_cookie(
@@ -790,7 +814,7 @@ class UserAPI:
                 }), 200)
                 
                 # Set cookie
-                is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+                is_production = is_production_request()
                 cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
                 if is_production:
                     response.set_cookie(

@@ -9,14 +9,36 @@ import os
 authenticate_api = Blueprint('authenticate_api', __name__, url_prefix='/api')
 api = Api(authenticate_api)
 
-SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key-change-this')
+def is_production_request():
+    """Check if this is a production request by examining headers and scheme.
+    
+    When behind nginx proxy, request.host may show localhost, so we check:
+    1. X-Forwarded-Proto header (set by nginx for HTTPS)
+    2. Request scheme
+    3. Host header as fallback
+    """
+    # Check X-Forwarded-Proto header (nginx sets this for HTTPS)
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+    if forwarded_proto == 'https':
+        return True
+    
+    # Check request scheme
+    if request.scheme == 'https':
+        return True
+    
+    # Fallback: check host (for direct access without proxy)
+    host = request.host.lower()
+    if not (host.startswith('localhost') or host.startswith('127.0.0.1')):
+        return True
+    
+    return False
 
 def set_jwt_cookie(response, token):
     """Centralized JWT cookie setting logic for cross-origin support"""
     cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
     
     # Detect if running in production or development
-    is_production = not (request.host.startswith('localhost') or request.host.startswith('127.0.0.1'))
+    is_production = is_production_request()
     
     if is_production:
         # Production: secure cookies for cross-domain HTTPS
@@ -48,10 +70,11 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
+        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
         
         # Check for token in cookies first
-        if 'jwt' in request.cookies:
-            token = request.cookies.get('jwt')
+        if cookie_name in request.cookies:
+            token = request.cookies.get(cookie_name)
         # Then check Authorization header
         elif 'Authorization' in request.headers:
             auth_header = request.headers['Authorization']
@@ -62,7 +85,7 @@ def token_required(f):
             return jsonify({'message': 'Token is missing'}), 401
         
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            data = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
             current_user = User.query.filter_by(_uid=data['_uid']).first()
             if not current_user:
                 return jsonify({'message': 'User not found'}), 401
@@ -107,7 +130,7 @@ class Authenticate(Resource):
             token = jwt.encode({
                 '_uid': user._uid,
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-            }, SECRET_KEY, algorithm="HS256")
+            }, current_app.config["SECRET_KEY"], algorithm="HS256")
             
             # Create response
             response = make_response(jsonify({

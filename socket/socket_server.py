@@ -2,18 +2,17 @@
 from flask_socketio import SocketIO, send, emit
 from flask import Flask
 
+# Import boss battle socket handlers
+from boss_battle import init_boss_battle_socket
+
 app = Flask(__name__)
 
-socketio = SocketIO(app, cors_allowed_origins=[
-    "http://localhost:8306",
-    "http://127.0.0.1:8306",
-    "http://localhost:4000",
-    "http://127.0.0.1:4000",
-    "https://open-coding-society.github.io",
-    "https://pages.opencodingsociety.com",
-    "https://akhilkulkarni123.github.io",
-])
+# Socket.IO server - runs on port 8500 for real-time multiplayer
+# Allow all origins in development for easier testing
+socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Initialize boss battle socket handlers
+init_boss_battle_socket(socketio)
 
 players = []  # Keep a list of players and scores
 
@@ -48,8 +47,20 @@ def handle_get_leaderboard():
     leaderboard = sorted(players, key=lambda x: x["score"], reverse=True)
     emit("leaderboard_update", leaderboard)
 
+@socketio.on('connect')
+def handle_connect():
+    print(f"[SOCKET] Client connected: {__import__('flask').request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f"[SOCKET] Client disconnected: {__import__('flask').request.sid}")
+
 
 # this runs the flask application on the development server
 if __name__ == "__main__":
-    # change name for testing
-    socketio.run(app, debug=True, host="0.0.0.0", port=8306)
+    print("\n" + "="*60)
+    print("🔌 Socket.IO Server starting on port 8500")
+    print("   - Boss Battle multiplayer enabled")
+    print("   - Leaderboard sync enabled")
+    print("="*60 + "\n")
+    socketio.run(app, debug=True, host="0.0.0.0", port=8500, allow_unsafe_werkzeug=True)

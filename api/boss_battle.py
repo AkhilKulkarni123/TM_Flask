@@ -27,15 +27,22 @@ def join_boss_battle():
     """Join or create a boss battle room"""
     try:
         user = g.current_user
-        
-        # Check if player has reached square 25
+
+        # Get player progress (or create if doesn't exist for testing)
         progress = GameProgress.query.filter_by(user_id=user.id).first()
-        if not progress or progress.current_position < 25:
-            return jsonify({'error': 'You must reach square 25 first'}), 403
-        
-        # Check if player has enough bullets
-        if progress.bullets < 10:
-            return jsonify({'error': 'You need at least 10 bullets to fight the boss'}), 403
+
+        # DEV MODE: Skip requirements if 'dev_mode' is passed in request
+        data = request.get_json() or {}
+        dev_mode = data.get('dev_mode', False)
+
+        if not dev_mode:
+            # Check if player has reached square 25
+            if not progress or progress.current_position < 25:
+                return jsonify({'error': 'You must reach square 25 first', 'current_position': progress.current_position if progress else 0}), 403
+
+            # Check if player has enough bullets
+            if progress.bullets < 10:
+                return jsonify({'error': 'You need at least 10 bullets to fight the boss', 'bullets': progress.bullets if progress else 0}), 403
         
         # Find an active room or create a new one
         room = BossRoom.query.filter_by(is_active=True, is_completed=False).first()
@@ -60,8 +67,9 @@ def join_boss_battle():
                 'player': existing_player.to_dict()
             }), 200
         
-        # Add player to room
-        player = BossPlayer(room_id=room.id, user_id=user.id, lives=progress.lives)
+        # Add player to room (use progress lives or default to 3)
+        player_lives = progress.lives if progress else 3
+        player = BossPlayer(room_id=room.id, user_id=user.id, lives=player_lives)
         db.session.add(player)
         
         # Get or create boss stats

@@ -78,12 +78,14 @@ def init_boss_battle_socket(socketio):
         player_count = len(boss_battles[room_id]['players'])
         players_list = get_room_players_list(room_id)
 
-        # Send room state to the joining player
+        # Send room state to the joining player (including powerups)
+        room_powerups = boss_battles[room_id].get('powerups', [])
         emit('boss_room_state', {
             'bossHealth': boss_battles[room_id]['boss_health'],
             'maxBossHealth': boss_battles[room_id]['max_health'],
             'playerCount': player_count,
-            'players': players_list
+            'players': players_list,
+            'powerups': room_powerups
         })
 
         # Notify all OTHER players in the room that someone joined
@@ -404,6 +406,94 @@ def init_boss_battle_socket(socketio):
         # Clean up sid mapping
         if sid in sid_to_room:
             del sid_to_room[sid]
+
+    # ==================== POWERUP SYSTEM ====================
+    import random
+    import time
+    import uuid
+
+    POWERUP_TYPES = ['damage', 'speed', 'rapidfire', 'heal']
+    POWERUP_SPAWN_INTERVAL = 15  # seconds between spawns
+    last_powerup_spawn = {}  # { room_id: timestamp }
+
+    def spawn_powerup_for_room(room_id):
+        """Spawn a powerup at a random location for a room"""
+        if room_id not in boss_battles:
+            return None
+
+        powerup_type = random.choice(POWERUP_TYPES)
+        # Spawn in the middle-bottom play area (avoiding boss zone)
+        x = random.randint(100, 700)
+        y = random.randint(300, 550)
+        powerup_id = str(uuid.uuid4())[:8]
+
+        powerup = {
+            'id': powerup_id,
+            'type': powerup_type,
+            'x': x,
+            'y': y,
+            'spawned_at': time.time()
+        }
+
+        # Store powerup in room state
+        if 'powerups' not in boss_battles[room_id]:
+            boss_battles[room_id]['powerups'] = []
+        boss_battles[room_id]['powerups'].append(powerup)
+
+        return powerup
+
+    @socketio.on('boss_request_powerup_spawn')
+    def handle_request_powerup_spawn(data):
+        """Handle request to potentially spawn a powerup (rate limited)"""
+        room_id = data.get('room_id')
+
+        if not room_id or room_id not in boss_battles:
+            return
+
+        current_time = time.time()
+        last_spawn = last_powerup_spawn.get(room_id, 0)
+
+        # Only spawn if enough time has passed
+        if current_time - last_spawn >= POWERUP_SPAWN_INTERVAL:
+            # Random chance to spawn (30% per check)
+            if random.random() < 0.3:
+                powerup = spawn_powerup_for_room(room_id)
+                if powerup:
+                    last_powerup_spawn[room_id] = current_time
+                    emit('boss_powerup_spawned', powerup, room=room_id)
+                    print(f"[BOSS] Powerup {powerup['type']} spawned in room {room_id}")
+
+    @socketio.on('boss_powerup_collected')
+    def handle_powerup_collected(data):
+        """Handle a player collecting a powerup"""
+        room_id = data.get('room_id')
+        powerup_id = data.get('powerup_id')
+        username = data.get('username', 'Unknown')
+
+        if not room_id or room_id not in boss_battles:
+            return
+
+        # Find and remove the powerup
+        powerup_type = None
+        if 'powerups' in boss_battles[room_id]:
+            for i, p in enumerate(boss_battles[room_id]['powerups']):
+                if p['id'] == powerup_id:
+                    powerup_type = p['type']
+                    boss_battles[room_id]['powerups'].pop(i)
+                    break
+
+        # Notify all players that powerup was collected
+        emit('boss_powerup_collected', {
+            'powerup_id': powerup_id,
+            'type': powerup_type,
+            'username': username,
+            'collector_sid': request.sid
+        }, room=room_id)
+
+        print(f"[BOSS] Player {username} collected powerup {powerup_id} ({powerup_type}) in room {room_id}")
+
+    # Periodic powerup spawning is triggered by clients
+    # to avoid needing a background thread
 
     # ==================== LEGACY EVENT HANDLERS ====================
     # Keep old event names working for backwards compatibility

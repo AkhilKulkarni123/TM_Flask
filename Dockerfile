@@ -1,21 +1,25 @@
 # Use official Python image
-FROM python:3.11
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (minimal)
 RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy app code
-COPY . /app
+# Copy only requirements first (for better caching)
+COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --upgrade pip && \
+# Install Python dependencies with no cache
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install gunicorn
+    pip install --no-cache-dir gunicorn
+
+# Copy rest of app code
+COPY . /app
 
 # Environment variables
 ENV FLASK_ENV=production \

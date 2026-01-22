@@ -9,7 +9,7 @@ boss_battles = {}  # { room_id: { boss_health, max_health, players: { sid: playe
 # Map socket session IDs to room IDs for cleanup on disconnect
 sid_to_room = {}  # { sid: room_id }
 
-MAX_PLAYERS_PER_ROOM = 5
+MAX_PLAYERS_PER_ROOM = 7
 
 def init_boss_battle_socket(socketio):
 
@@ -56,7 +56,7 @@ def init_boss_battle_socket(socketio):
 
         # Check if room is full
         if len(boss_battles[room_id]['players']) >= MAX_PLAYERS_PER_ROOM:
-            emit('boss_room_full', {'message': 'Room is full (max 5 players)'})
+            emit('boss_room_full', {'message': 'Room is full (max 7 players)'})
             return
 
         # Join the socket room
@@ -249,6 +249,52 @@ def init_boss_battle_socket(socketio):
                     'lives': player['lives']
                 }
             }, room=room_id)
+
+    # ==================== PLAYER AWAY (TAB SWITCH) ====================
+    @socketio.on('boss_player_away')
+    def handle_player_away(data):
+        """Handle player switching away from the tab"""
+        room_id = data.get('room_id')
+        username = data.get('username', 'Unknown')
+        sid = request.sid
+
+        if not room_id or room_id not in boss_battles:
+            return
+
+        if sid in boss_battles[room_id]['players']:
+            boss_battles[room_id]['players'][sid]['isAway'] = True
+
+        # Notify all OTHER players that this player is away
+        emit('boss_player_away', {
+            'sid': sid,
+            'username': username,
+            'message': f'{username} switched away from the game'
+        }, room=room_id, include_self=False)
+
+        print(f"[BOSS] Player {username} ({sid}) went away from room {room_id}")
+
+    # ==================== PLAYER RETURNED ====================
+    @socketio.on('boss_player_returned')
+    def handle_player_returned(data):
+        """Handle player returning to the tab"""
+        room_id = data.get('room_id')
+        username = data.get('username', 'Unknown')
+        sid = request.sid
+
+        if not room_id or room_id not in boss_battles:
+            return
+
+        if sid in boss_battles[room_id]['players']:
+            boss_battles[room_id]['players'][sid]['isAway'] = False
+
+        # Notify all OTHER players that this player is back
+        emit('boss_player_returned', {
+            'sid': sid,
+            'username': username,
+            'message': f'{username} is back!'
+        }, room=room_id, include_self=False)
+
+        print(f"[BOSS] Player {username} ({sid}) returned to room {room_id}")
 
     # ==================== CHAT MESSAGE ====================
     @socketio.on('boss_chat_send')

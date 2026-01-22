@@ -442,6 +442,7 @@ def delete_user(user_id):
 @app.route('/users/reset_password/<int:user_id>', methods=['POST'])
 @login_required
 def reset_password(user_id):
+    """Reset user password with optional custom password"""
     if current_user.role != 'Admin':
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -449,8 +450,23 @@ def reset_password(user_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    if user.update({"password": app.config['DEFAULT_PASSWORD']}):
-        return jsonify({'message': 'Password reset successfully'}), 200
+    # Get password from request body if provided
+    data = request.get_json() or {}
+    new_password = data.get('password')
+    
+    # Use provided password or default
+    password_to_set = new_password if new_password else app.config['DEFAULT_PASSWORD']
+    
+    # Validate password length
+    if len(password_to_set) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    
+    if user.update({"password": password_to_set}):
+        return jsonify({
+            'message': 'Password reset successfully',
+            'password_set': 'custom' if new_password else 'default'
+        }), 200
+    
     return jsonify({'error': 'Password reset failed'}), 500
 
 @app.route('/update_user/<string:uid>', methods=['PUT'])
@@ -633,39 +649,7 @@ def delete_game_data(user_id):
     return jsonify({'message': 'Game data deleted successfully'}), 200
 
 
-# ============================================================================
-# IMPROVED USER MANAGEMENT ROUTES (Replace existing routes in main.py)
-# ============================================================================
 
-@app.route('/users/reset_password/<int:user_id>', methods=['POST'])
-@login_required
-def reset_password(user_id):
-    """Reset user password with optional custom password"""
-    if current_user.role != 'Admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-
-    # Get password from request body if provided
-    data = request.get_json() or {}
-    new_password = data.get('password')
-    
-    # Use provided password or default
-    password_to_set = new_password if new_password else app.config['DEFAULT_PASSWORD']
-    
-    # Validate password length
-    if len(password_to_set) < 8:
-        return jsonify({'error': 'Password must be at least 8 characters'}), 400
-    
-    if user.update({"password": password_to_set}):
-        return jsonify({
-            'message': 'Password reset successfully',
-            'password_set': 'custom' if new_password else 'default'
-        }), 200
-    
-    return jsonify({'error': 'Password reset failed'}), 500
 
 # ============================================================================
 # CLI COMMANDS

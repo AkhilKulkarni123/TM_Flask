@@ -551,6 +551,121 @@ def delete_user_kasm(user_id):
 
     except requests.RequestException as e:
         return {'message': 'Error connecting to KASM API', 'error': str(e)}, 500
+    
+# ============================================================================
+# GAME DATA MANAGEMENT ROUTES (Add these to your main.py)
+# ============================================================================
+
+from model.snakes_game import SnakesGameData
+
+@app.route('/api/snakes_game/<int:user_id>', methods=['GET'])
+@login_required
+def get_game_data(user_id):
+    """Get game data for a specific user"""
+    if current_user.role != 'Admin' and current_user.id != user_id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    game_data = SnakesGameData.query.filter_by(user_id=user_id).first()
+    
+    if not game_data:
+        # Return default data if no game data exists
+        return jsonify({
+            'user_id': user_id,
+            'total_bullets': 0,
+            'selected_character': 'default',
+            'current_square': 1,
+            'lives': 3,
+            'game_status': 'active'
+        }), 200
+    
+    return jsonify(game_data.read()), 200
+
+@app.route('/api/snakes_game/<int:user_id>', methods=['PUT'])
+@login_required
+def update_game_data(user_id):
+    """Update game data for a specific user"""
+    if current_user.role != 'Admin':
+        return jsonify({'error': 'Unauthorized - Admin only'}), 403
+    
+    data = request.get_json()
+    
+    # Get or create game data
+    game_data = SnakesGameData.query.filter_by(user_id=user_id).first()
+    
+    if not game_data:
+        # Create new game data if it doesn't exist
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        game_data = SnakesGameData(
+            user_id=user_id,
+            username=user.uid,
+            selected_character=data.get('selected_character', 'default')
+        )
+        game_data.total_bullets = data.get('total_bullets', 0)
+        game_data.create()
+    else:
+        # Update existing game data
+        update_dict = {}
+        if 'total_bullets' in data:
+            update_dict['total_bullets'] = data['total_bullets']
+        if 'selected_character' in data:
+            update_dict['selected_character'] = data['selected_character']
+        
+        game_data.update(update_dict)
+    
+    return jsonify(game_data.read()), 200
+
+@app.route('/api/snakes_game/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_game_data(user_id):
+    """Delete game data for a specific user"""
+    if current_user.role != 'Admin':
+        return jsonify({'error': 'Unauthorized - Admin only'}), 403
+    
+    game_data = SnakesGameData.query.filter_by(user_id=user_id).first()
+    
+    if not game_data:
+        return jsonify({'error': 'Game data not found'}), 404
+    
+    game_data.delete()
+    return jsonify({'message': 'Game data deleted successfully'}), 200
+
+
+# ============================================================================
+# IMPROVED USER MANAGEMENT ROUTES (Replace existing routes in main.py)
+# ============================================================================
+
+@app.route('/users/reset_password/<int:user_id>', methods=['POST'])
+@login_required
+def reset_password(user_id):
+    """Reset user password with optional custom password"""
+    if current_user.role != 'Admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Get password from request body if provided
+    data = request.get_json() or {}
+    new_password = data.get('password')
+    
+    # Use provided password or default
+    password_to_set = new_password if new_password else app.config['DEFAULT_PASSWORD']
+    
+    # Validate password length
+    if len(password_to_set) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    
+    if user.update({"password": password_to_set}):
+        return jsonify({
+            'message': 'Password reset successfully',
+            'password_set': 'custom' if new_password else 'default'
+        }), 200
+    
+    return jsonify({'error': 'Password reset failed'}), 500
 
 # ============================================================================
 # CLI COMMANDS

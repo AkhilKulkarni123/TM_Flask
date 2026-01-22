@@ -1,174 +1,510 @@
 {% extends "layouts/base.html" %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+<style>
+    .game-data-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin: 2px;
+    }
+    
+    .bullets-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .character-badge {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    
+    .edit-controls {
+        display: none;
+        margin-top: 10px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+    }
+    
+    .edit-controls.active {
+        display: block;
+    }
+    
+    .input-group-small {
+        margin-bottom: 10px;
+    }
+    
+    .input-group-small label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+    }
+    
+    .input-group-small input,
+    .input-group-small select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .btn-group-compact {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-sm-custom {
+        padding: 5px 12px;
+        font-size: 0.85rem;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .btn-edit {
+        background: #0d6efd;
+        color: white;
+    }
+    
+    .btn-edit:hover {
+        background: #0b5ed7;
+    }
+    
+    .btn-save {
+        background: #198754;
+        color: white;
+    }
+    
+    .btn-save:hover {
+        background: #157347;
+    }
+    
+    .btn-cancel {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-cancel:hover {
+        background: #5c636a;
+    }
+    
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-delete:hover {
+        background: #bb2d3b;
+    }
+    
+    .btn-reset {
+        background: #ffc107;
+        color: #000;
+    }
+    
+    .btn-reset:hover {
+        background: #ffca2c;
+    }
+    
+    .table-container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
 {% block body %}
-
 <div class="container mt-5">
-    <h1>User Management</h1>
+    <div class="table-container">
+        <h1 class="mb-4">🎮 User Management</h1>
 
-    <table class="table table-striped" id="userTable">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>UID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Profile Picture</th>
-                <th>Kasm Server Needed</th>
-                <th>Courses</th>
-                <th>Commits</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in user_data %}
-            {% if user.id == current_user.id or current_user.role == 'Admin' %}
-            <tr id="user-{{ user.id }}">
-                <td>{{ user.id }}</td>
-                <td>{{ user.uid }}</td>
-                <td>{{ user.name }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
-                <td>
-                    {% if user.pfp %}
-                    <img src="{{ url_for('uploaded_file', filename=user.uid + '/' + user.pfp) }}" 
-                         alt="Profile Picture" 
-                         class="img-thumbnail" 
-                         style="width: 50px; height: 50px;">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='assets/pythondb.png') }}" 
-                         alt="Default Profile Picture" 
-                         class="img-thumbnail" 
-                         style="width: 50px; height: 50px;">
-                    {% endif %}
-                </td>
-                <td id="kasm-{{ user.id }}">{{ user.kasm_server_needed }}</td>
-                <td>
-                    {% for section in user.sections %}
-                    {{ section.abbreviation }}{% if not loop.last %}, {% endif %}
-                    {% endfor %}
-                </td>
-                <td id="commits-{{ user.uid }}">Loading...</td>
-                <td>
-                    <button class="btn btn-primary edit-btn" data-id="{{ user.id }}">Edit</button>
-                    {% if current_user.role == 'Admin' %}
-                    <button class="btn btn-danger delete-btn" data-id="{{ user.id }}">Delete</button>
-                    <button class="btn btn-warning reset-password-btn" data-id="{{ user.id }}">Reset Password</button>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endif %}
-            {% endfor %}
-        </tbody>
-    </table>
+        <table class="table table-striped table-hover" id="userTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>UID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Profile</th>
+                    <th>Game Data</th>
+                    <th>Commits</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in user_data %}
+                {% if user.id == current_user.id or current_user.role == 'Admin' %}
+                <tr id="user-{{ user.id }}">
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.uid }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>
+                        {% if user.pfp %}
+                        <img src="{{ url_for('uploaded_file', filename=user.uid + '/' + user.pfp) }}" 
+                             alt="Profile" 
+                             class="img-thumbnail" 
+                             style="width: 50px; height: 50px;">
+                        {% else %}
+                        <img src="{{ url_for('static', filename='assets/pythondb.png') }}" 
+                             alt="Default" 
+                             class="img-thumbnail" 
+                             style="width: 50px; height: 50px;">
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div id="game-data-{{ user.id }}">
+                            <span class="game-data-badge bullets-badge">
+                                🎯 <span class="bullets-count">Loading...</span>
+                            </span>
+                            <br>
+                            <span class="game-data-badge character-badge">
+                                👤 <span class="character-name">Loading...</span>
+                            </span>
+                        </div>
+                        
+                        <!-- Edit Controls -->
+                        <div id="edit-controls-{{ user.id }}" class="edit-controls">
+                            <div class="input-group-small">
+                                <label for="bullets-{{ user.id }}">Bullets:</label>
+                                <input type="number" id="bullets-{{ user.id }}" 
+                                       class="form-control" min="0" value="0">
+                            </div>
+                            <div class="input-group-small">
+                                <label for="character-{{ user.id }}">Character:</label>
+                                <select id="character-{{ user.id }}" class="form-control">
+                                    <option value="default">Default</option>
+                                    <option value="ninja">Ninja</option>
+                                    <option value="wizard">Wizard</option>
+                                    <option value="warrior">Warrior</option>
+                                    <option value="rogue">Rogue</option>
+                                    <option value="mage">Mage</option>
+                                </select>
+                            </div>
+                            <div class="btn-group-compact">
+                                <button class="btn-sm-custom btn-save save-game-btn" 
+                                        data-id="{{ user.id }}" data-uid="{{ user.uid }}">
+                                    ✅ Save
+                                </button>
+                                <button class="btn-sm-custom btn-cancel cancel-edit-btn" 
+                                        data-id="{{ user.id }}">
+                                    ❌ Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                    <td id="commits-{{ user.uid }}">Loading...</td>
+                    <td>
+                        <div class="btn-group-compact">
+                            {% if current_user.role == 'Admin' %}
+                            <button class="btn-sm-custom btn-edit edit-game-btn" 
+                                    data-id="{{ user.id }}" data-uid="{{ user.uid }}">
+                                ✏️ Edit Game
+                            </button>
+                            <button class="btn-sm-custom btn-reset reset-password-btn" 
+                                    data-id="{{ user.id }}">
+                                🔑 Reset PW
+                            </button>
+                            <button class="btn-sm-custom btn-delete delete-btn" 
+                                    data-id="{{ user.id }}">
+                                🗑️ Delete
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<!-- jQuery, DataTables, and Bootstrap -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
-    $(document).ready(function () {
-        // Initialize DataTables
-        const table =  $("#userTable").DataTable(); // repersents table
+$(document).ready(function () {
+    const table = $("#userTable").DataTable({
+        pageLength: -1,
+        order: [[0, 'asc']]
+    });
 
-        table.page.len(-1).draw();  // shows all users and commits
-        // Function to fetch commits
-        async function fetchAdminData(userUid) {
-            const commitsElement = $(`#commits-${userUid}`);
+    // Store game data for each user
+    const gameDataCache = {};
 
-            if (!commitsElement.length) return;
-
-            const today = new Date();
-            const startDate = new Date();
-            startDate.setDate(today.getDate() - 30);
-
-            const formattedStartDate = startDate.toISOString().split('T')[0];
-            const formattedEndDate = today.toISOString().split('T')[0];
-
+    // Fetch game data for all users
+    async function fetchAllGameData() {
+        const users = $("[id^='game-data-']");
+        
+        for (let i = 0; i < users.length; i++) {
+            const userId = users[i].id.split("-")[2];
+            const userRow = $(`#user-${userId}`);
+            const userUid = userRow.find('td:eq(1)').text();
+            
             try {
-                const response = await fetch(`/api/analytics/commits/${userUid}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start_date: formattedStartDate, end_date: formattedEndDate })
-                });
+                const response = await fetch(`/api/snakes_game/${userId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    gameDataCache[userId] = data;
+                    
+                    // Update display
+                    $(`#game-data-${userId} .bullets-count`).text(`${data.total_bullets || 0} bullets`);
+                    $(`#game-data-${userId} .character-name`).text(data.selected_character || 'default');
+                    
+                    // Update input fields
+                    $(`#bullets-${userId}`).val(data.total_bullets || 0);
+                    $(`#character-${userId}`).val(data.selected_character || 'default');
+                } else {
+                    $(`#game-data-${userId} .bullets-count`).text('No data');
+                    $(`#game-data-${userId} .character-name`).text('No data');
+                }
+            } catch (error) {
+                console.error(`Error fetching game data for user ${userId}:`, error);
+                $(`#game-data-${userId} .bullets-count`).text('Error');
+                $(`#game-data-${userId} .character-name`).text('Error');
+            }
+            
+            // Small delay to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
 
-                if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+    // Fetch commits data
+    async function fetchAdminData(userUid) {
+        const commitsElement = $(`#commits-${userUid}`);
+        if (!commitsElement.length) return;
 
+        const today = new Date();
+        const startDate = new Date();
+        startDate.setDate(today.getDate() - 30);
+
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = today.toISOString().split('T')[0];
+
+        try {
+            const response = await fetch(`/api/analytics/commits/${userUid}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    start_date: formattedStartDate, 
+                    end_date: formattedEndDate 
+                })
+            });
+
+            if (response.ok) {
                 const data = await response.json();
                 commitsElement.text(data.commits?.total_commit_contributions || "0");
+            } else {
+                commitsElement.text("0");
+            }
+        } catch (error) {
+            console.error("Error fetching commits:", error);
+            commitsElement.text("Error");
+        }
+    }
 
-            } catch (error) {
-                console.error("Error:", error);
+    // Process all users
+    async function processUsers() {
+        // Fetch game data first
+        await fetchAllGameData();
+        
+        // Then fetch commits
+        const users = $("[id^='commits-']");
+        for (let i = 0; i < users.length; i++) {
+            const userUid = users[i].id.split("-")[1];
+            await fetchAdminData(userUid);
+            
+            if ((i + 1) % 15 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 4000));
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
+        
+        table.page.len(10).draw();
+    }
 
-        // Batch processing with delay
-        async function processUsersWithDelay() {
-            const users = $("[id^='commits-']");
-            console.log(`Total users found: ${users.length}`);
+    processUsers();
 
-
-            for (let i = 0; i < users.length; i++) {
-                const userUid = users[i].id.split("-")[1];
-
-                await fetchAdminData(userUid);
-
-                if ((i + 1) % 15 === 0) {
-                    console.log(`Pausing for 5 seconds...`);
-                    await new Promise(resolve => setTimeout(resolve, 4000)); // tinker this however depending on rate limiting
-                } else {
-                    console.log(`Waiting for 2 seconds...`);
-                    await new Promise(resolve => setTimeout(resolve, 100));  // tinker this however depending on rate limiting
-                }
-            }
-
-            table.page.len(10).draw();  
-        }
-
-        // Start processing users with a delay yep
-        processUsersWithDelay();
-
-        // Handle delete action
-        document.querySelectorAll(".delete-btn").forEach(button => {
-            button.addEventListener("click", function () {
-                const id = this.dataset.id;
-                fetch(`/users/delete/${id}`, {
-                    method: "DELETE",
-                    headers: { "Content-Type": "application/json" },
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message || "User deleted successfully.");
-                        location.reload();
-                    })
-                    .catch(error => {
-                        console.error("Error deleting user:", error);
-                        alert("Error deleting user.");
-                    });
-            });
-        });
-
-        // Handle reset password action
-        document.querySelectorAll(".reset-password-btn").forEach(button => {
-            button.addEventListener("click", function () {
-                const id = this.dataset.id;
-                fetch(`/users/reset_password/${id}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message || "Password reset successfully.");
-                    })
-                    .catch(error => {
-                        console.error("Error resetting password:", error);
-                        alert("Error resetting password.");
-                    });
-            });
-        });
+    // Edit game data button
+    $(document).on('click', '.edit-game-btn', function() {
+        const userId = $(this).data('id');
+        $(`#edit-controls-${userId}`).addClass('active');
+        $(this).prop('disabled', true);
     });
+
+    // Cancel edit button
+    $(document).on('click', '.cancel-edit-btn', function() {
+        const userId = $(this).data('id');
+        $(`#edit-controls-${userId}`).removeClass('active');
+        $(`.edit-game-btn[data-id="${userId}"]`).prop('disabled', false);
+        
+        // Reset values
+        if (gameDataCache[userId]) {
+            $(`#bullets-${userId}`).val(gameDataCache[userId].total_bullets || 0);
+            $(`#character-${userId}`).val(gameDataCache[userId].selected_character || 'default');
+        }
+    });
+
+    // Save game data button
+    $(document).on('click', '.save-game-btn', async function() {
+        const userId = $(this).data('id');
+        const bullets = parseInt($(`#bullets-${userId}`).val()) || 0;
+        const character = $(`#character-${userId}`).val();
+
+        try {
+            const response = await fetch(`/api/snakes_game/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    total_bullets: bullets,
+                    selected_character: character
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update cache
+                gameDataCache[userId] = data;
+                
+                // Update display
+                $(`#game-data-${userId} .bullets-count`).text(`${bullets} bullets`);
+                $(`#game-data-${userId} .character-name`).text(character);
+                
+                // Hide edit controls
+                $(`#edit-controls-${userId}`).removeClass('active');
+                $(`.edit-game-btn[data-id="${userId}"]`).prop('disabled', false);
+                
+                alert('Game data updated successfully!');
+            } else {
+                alert('Failed to update game data');
+            }
+        } catch (error) {
+            console.error('Error updating game data:', error);
+            alert('Error updating game data');
+        }
+    });
+
+    // Delete user button - Fixed with better event handling
+    $(document).on('click', '.delete-btn', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const button = $(this);
+        
+        // Prevent multiple clicks
+        if (button.prop('disabled')) return;
+        
+        const userId = button.data('id');
+        const userName = button.closest('tr').find('td:eq(2)').text();
+        
+        if (!confirm(`⚠️ Are you sure you want to DELETE user "${userName}"?\n\nThis action CANNOT be undone!`)) {
+            return;
+        }
+        
+        // Disable button and show loading state
+        button.prop('disabled', true);
+        button.html('⏳ Deleting...');
+        
+        try {
+            const response = await fetch(`/users/delete/${userId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('✅ ' + (data.message || 'User deleted successfully.'));
+                location.reload();
+            } else {
+                throw new Error(data.error || 'Failed to delete user');
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('❌ Error deleting user: ' + error.message);
+            // Re-enable button on error
+            button.prop('disabled', false);
+            button.html('🗑️ Delete');
+        }
+    });
+
+    // Reset password button - Fixed with new password prompt
+    $(document).on('click', '.reset-password-btn', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const button = $(this);
+        
+        // Prevent multiple clicks
+        if (button.prop('disabled')) return;
+        
+        const userId = button.data('id');
+        const userName = button.closest('tr').find('td:eq(2)').text();
+        
+        // Prompt for new password
+        const newPassword = prompt(
+            `🔑 Reset password for "${userName}"\n\n` +
+            `Enter new password (min 8 characters):\n` +
+            `Leave blank to use default password (123Qwerty!)`
+        );
+        
+        // User cancelled
+        if (newPassword === null) return;
+        
+        // Validate password if provided
+        if (newPassword !== '' && newPassword.length < 8) {
+            alert('❌ Password must be at least 8 characters long!');
+            return;
+        }
+        
+        // Disable button and show loading state
+        button.prop('disabled', true);
+        button.html('⏳ Resetting...');
+        
+        try {
+            const response = await fetch(`/users/reset_password/${userId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: newPassword || undefined
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                const displayPassword = newPassword || '123Qwerty!';
+                alert(`✅ Password reset successfully!\n\nNew password: ${displayPassword}`);
+            } else {
+                throw new Error(data.error || 'Failed to reset password');
+            }
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            alert('❌ Error resetting password: ' + error.message);
+        } finally {
+            // Re-enable button
+            button.prop('disabled', false);
+            button.html('🔑 Reset PW');
+        }
+    });
+});
 </script>
 
 {% endblock %}

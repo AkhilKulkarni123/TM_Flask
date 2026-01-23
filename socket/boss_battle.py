@@ -339,13 +339,13 @@ def init_boss_battle_socket(socketio):
         # Sanitize content (basic length limit)
         content = content[:280]
 
-        # Broadcast chat message to ALL players in room (including sender for confirmation)
+        # Broadcast chat message to all OTHER players in room (sender displays locally)
         emit('boss_chat_message', {
             'sid': sid,
             'username': username,
             'character': character,
             'content': content
-        }, room=room_id)
+        }, room=room_id, include_self=False)
 
         print(f"[CHAT] {username}: {content[:50]}...")
 

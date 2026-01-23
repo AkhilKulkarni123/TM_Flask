@@ -298,6 +298,31 @@ def init_boss_battle_socket(socketio):
 
         print(f"[BOSS] Player {username} ({sid}) returned to room {room_id}")
 
+    # ==================== LOBBY (PRE-BATTLE CHAT) ====================
+    @socketio.on('boss_join_lobby')
+    def handle_join_lobby(data):
+        """Handle player joining the lobby for pre-battle chat"""
+        username = data.get('username', 'Guest')
+        character = data.get('character', 'knight')
+        lobby_room = 'boss_lobby'
+
+        join_room(lobby_room)
+
+        # Notify others in lobby
+        emit('boss_chat_message', {
+            'sid': request.sid,
+            'username': 'System',
+            'character': 'knight',
+            'content': f'{username} joined the lobby'
+        }, room=lobby_room, include_self=False)
+
+        print(f"[BOSS] Player {username} ({request.sid}) joined lobby for chat")
+
+    @socketio.on('boss_leave_lobby')
+    def handle_leave_lobby(data):
+        """Handle player leaving the lobby when they start battle"""
+        leave_room('boss_lobby')
+
     # ==================== CHAT MESSAGE ====================
     @socketio.on('boss_chat_send')
     def handle_chat_message(data):
@@ -413,7 +438,7 @@ def init_boss_battle_socket(socketio):
     import uuid
 
     POWERUP_TYPES = ['damage', 'speed', 'rapidfire', 'heal']
-    POWERUP_SPAWN_INTERVAL = 15  # seconds between spawns
+    POWERUP_SPAWN_INTERVAL = 5  # seconds between spawns
     last_powerup_spawn = {}  # { room_id: timestamp }
 
     def spawn_powerup_for_room(room_id):
@@ -455,13 +480,11 @@ def init_boss_battle_socket(socketio):
 
         # Only spawn if enough time has passed
         if current_time - last_spawn >= POWERUP_SPAWN_INTERVAL:
-            # Random chance to spawn (30% per check)
-            if random.random() < 0.3:
-                powerup = spawn_powerup_for_room(room_id)
-                if powerup:
-                    last_powerup_spawn[room_id] = current_time
-                    emit('boss_powerup_spawned', powerup, room=room_id)
-                    print(f"[BOSS] Powerup {powerup['type']} spawned in room {room_id}")
+            powerup = spawn_powerup_for_room(room_id)
+            if powerup:
+                last_powerup_spawn[room_id] = current_time
+                emit('boss_powerup_spawned', powerup, room=room_id)
+                print(f"[BOSS] Powerup {powerup['type']} spawned in room {room_id}")
 
     @socketio.on('boss_powerup_collected')
     def handle_powerup_collected(data):

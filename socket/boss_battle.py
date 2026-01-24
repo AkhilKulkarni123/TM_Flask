@@ -9,6 +9,9 @@ boss_battles = {}  # { room_id: { boss_health, max_health, players: { sid: playe
 # Map socket session IDs to room IDs for cleanup on disconnect
 sid_to_room = {}  # { sid: room_id }
 
+# Lobby members for pre-battle chat - { sid: { username, character } }
+lobby_members = {}
+
 MAX_PLAYERS_PER_ROOM = 7
 
 def init_boss_battle_socket(socketio):
@@ -304,29 +307,39 @@ def init_boss_battle_socket(socketio):
         """Handle player joining the lobby for pre-battle chat"""
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
-        lobby_room = 'boss_lobby'
+        sid = request.sid
 
-        join_room(lobby_room)
+        # Track lobby member
+        lobby_members[sid] = {
+            'username': username,
+            'character': character
+        }
 
-        # Notify others in lobby
-        emit('boss_chat_message', {
-            'sid': request.sid,
+        # Notify others in lobby via direct emit
+        message_data = {
+            'sid': sid,
             'username': 'System',
             'character': 'knight',
             'content': f'{username} joined the lobby'
-        }, room=lobby_room, include_self=False)
+        }
+        for member_sid in list(lobby_members.keys()):
+            if member_sid != sid:
+                socketio.emit('boss_chat_message', message_data, to=member_sid)
 
-        print(f"[BOSS] Player {username} ({request.sid}) joined lobby for chat")
+        print(f"[BOSS] Player {username} ({sid}) joined lobby for chat. Lobby size: {len(lobby_members)}")
 
     @socketio.on('boss_leave_lobby')
     def handle_leave_lobby(data):
         """Handle player leaving the lobby when they start battle"""
-        leave_room('boss_lobby')
+        sid = request.sid
+        if sid in lobby_members:
+            del lobby_members[sid]
+            print(f"[BOSS] Player ({sid}) left lobby. Lobby size: {len(lobby_members)}")
 
     # ==================== CHAT MESSAGE ====================
     @socketio.on('boss_chat_send')
     def handle_chat_message(data):
-        """Handle chat messages - broadcast to all players in room"""
+        """Handle chat messages - send to all other players"""
         room_id = data.get('room_id')
         content = data.get('content', '')
         username = data.get('username', 'Anonymous')
@@ -339,13 +352,23 @@ def init_boss_battle_socket(socketio):
         # Sanitize content (basic length limit)
         content = content[:280]
 
-        # Broadcast chat message to all OTHER players in room (sender displays locally)
-        emit('boss_chat_message', {
+        message_data = {
             'sid': sid,
             'username': username,
             'character': character,
             'content': content
-        }, room=room_id, include_self=False)
+        }
+
+        # For battle rooms, emit directly to each player's socket individually
+        if room_id in boss_battles and boss_battles[room_id]['players']:
+            for player_sid in list(boss_battles[room_id]['players'].keys()):
+                if player_sid != sid:
+                    socketio.emit('boss_chat_message', message_data, to=player_sid)
+        else:
+            # For lobby, emit directly to each lobby member's socket
+            for member_sid in list(lobby_members.keys()):
+                if member_sid != sid:
+                    socketio.emit('boss_chat_message', message_data, to=member_sid)
 
         print(f"[CHAT] {username}: {content[:50]}...")
 
@@ -431,6 +454,10 @@ def init_boss_battle_socket(socketio):
         # Clean up sid mapping
         if sid in sid_to_room:
             del sid_to_room[sid]
+
+        # Clean up lobby membership
+        if sid in lobby_members:
+            del lobby_members[sid]
 
     # ==================== POWERUP SYSTEM ====================
     import random

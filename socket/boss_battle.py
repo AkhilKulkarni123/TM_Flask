@@ -339,11 +339,9 @@ def init_boss_battle_socket(socketio):
     # ==================== CHAT MESSAGE ====================
     @socketio.on('boss_chat_send')
     def handle_chat_message(data):
-        """Handle chat messages - send to all other players"""
+        """Handle chat messages - broadcast to all players in room"""
         room_id = data.get('room_id')
         content = data.get('content', '')
-        username = data.get('username', 'Anonymous')
-        character = data.get('character', 'knight')
         sid = request.sid
 
         if not room_id or not content:
@@ -352,23 +350,41 @@ def init_boss_battle_socket(socketio):
         # Sanitize content (basic length limit)
         content = content[:280]
 
-        message_data = {
-            'sid': sid,
-            'username': username,
-            'character': character,
-            'content': content
-        }
-
-        # For battle rooms, emit directly to each player's socket individually
+        # For battle rooms, verify player is in the room and use stored player data
         if room_id in boss_battles and boss_battles[room_id]['players']:
+            if sid not in boss_battles[room_id]['players']:
+                print(f"[CHAT] Player {sid} not in room {room_id}")
+                return
+
+            # Get player info from stored data (prevents spoofing)
+            player = boss_battles[room_id]['players'][sid]
+            username = player.get('username', 'Anonymous')
+            character = player.get('character', 'knight')
+
+            message_data = {
+                'sid': sid,
+                'username': username,
+                'character': character,
+                'content': content
+            }
+
+            # Emit to ALL players in the room including sender
             for player_sid in list(boss_battles[room_id]['players'].keys()):
-                if player_sid != sid:
-                    socketio.emit('boss_chat_message', message_data, to=player_sid)
+                socketio.emit('boss_chat_message', message_data, to=player_sid)
         else:
-            # For lobby, emit directly to each lobby member's socket
+            # For lobby, emit to all lobby members including sender
+            username = data.get('username', 'Anonymous')
+            character = data.get('character', 'knight')
+
+            message_data = {
+                'sid': sid,
+                'username': username,
+                'character': character,
+                'content': content
+            }
+
             for member_sid in list(lobby_members.keys()):
-                if member_sid != sid:
-                    socketio.emit('boss_chat_message', message_data, to=member_sid)
+                socketio.emit('boss_chat_message', message_data, to=member_sid)
 
         print(f"[CHAT] {username}: {content[:50]}...")
 

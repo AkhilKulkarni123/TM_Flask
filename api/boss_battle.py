@@ -44,8 +44,8 @@ def join_boss_battle():
             if progress.bullets < 10:
                 return jsonify({'error': 'You need at least 10 bullets to fight the boss', 'bullets': progress.bullets if progress else 0}), 403
         
-        # Find an active room with space (max 7 players) or create a new one
-        MAX_PLAYERS_PER_ROOM = 7
+        # Find an active room with space (max 10 players) or create a new one
+        MAX_PLAYERS_PER_ROOM = 10
         room = None
         active_rooms = BossRoom.query.filter_by(is_active=True, is_completed=False).all()
         for candidate in active_rooms:

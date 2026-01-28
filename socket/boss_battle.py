@@ -17,6 +17,17 @@ LOBBY_ROOM = 'boss_lobby'
 
 MAX_PLAYERS_PER_ROOM = 10
 
+# PVP Arena state - max 2 players
+pvp_room = {
+    'players': {},  # { sid: player_data }
+    'player_order': [],  # [sid1, sid2] - order of joining
+    'battle_active': False,
+    'ready_players': set()
+}
+pvp_sid_mapping = {}  # { sid: True } - tracks who's in PVP
+PVP_ROOM_NAME = 'pvp_arena'
+MAX_PVP_PLAYERS = 2
+
 def init_boss_battle_socket(socketio):
 
     def get_room_players_list(room_id):
@@ -612,6 +623,10 @@ def init_boss_battle_socket(socketio):
 
             print(f"[BOSS] Player {username} ({sid}) disconnected from lobby. Lobby size: {lobby_count}")
 
+        # Clean up PVP arena (uses module-level pvp_sid_mapping)
+        if sid in pvp_sid_mapping:
+            cleanup_pvp_player(sid)
+
     # ==================== POWERUP SYSTEM ====================
     import random
     import time
@@ -804,3 +819,275 @@ def init_boss_battle_socket(socketio):
                     'playerCount': 0,
                     'error': 'Not in a room'
                 })
+
+    # ==================== PVP ARENA HANDLERS ====================
+    # PVP state is defined at module level (pvp_room, pvp_sid_mapping, PVP_ROOM_NAME, MAX_PVP_PLAYERS)
+
+    def get_pvp_player_count():
+        """Get current number of players in PVP arena"""
+        return len(pvp_room['players'])
+
+    def get_pvp_opponent(sid):
+        """Get the opponent's data for a given player"""
+        for player_sid, player_data in pvp_room['players'].items():
+            if player_sid != sid:
+                return {'sid': player_sid, **player_data}
+        return None
+
+    def broadcast_pvp_status():
+        """Broadcast current PVP room status to all connected clients"""
+        socketio.emit('pvp_status', {
+            'playerCount': get_pvp_player_count(),
+            'isFull': get_pvp_player_count() >= MAX_PVP_PLAYERS,
+            'battleActive': pvp_room['battle_active']
+        })
+
+    @socketio.on('pvp_get_status')
+    def handle_pvp_get_status(data):
+        """Return current PVP room status"""
+        emit('pvp_status', {
+            'playerCount': get_pvp_player_count(),
+            'isFull': get_pvp_player_count() >= MAX_PVP_PLAYERS,
+            'battleActive': pvp_room['battle_active']
+        })
+
+    @socketio.on('pvp_join')
+    def handle_pvp_join(data):
+        """Handle player joining PVP arena"""
+        sid = request.sid
+        username = data.get('username', 'Guest')
+        character = data.get('character', 'knight')
+        bullets = data.get('bullets', 0)
+        lives = data.get('lives', 3)
+
+        # Check if room is full
+        if get_pvp_player_count() >= MAX_PVP_PLAYERS:
+            emit('pvp_room_full', {'message': 'PVP arena is full (max 2 players)'})
+            return
+
+        # Join the socket room
+        join_room(PVP_ROOM_NAME)
+        pvp_sid_mapping[sid] = True
+
+        # Determine player number (1 or 2)
+        player_number = len(pvp_room['player_order']) + 1
+
+        # Add player to arena
+        pvp_room['players'][sid] = {
+            'username': username,
+            'character': character,
+            'bullets': bullets,
+            'lives': lives,
+            'x': 100 if player_number == 1 else 700,
+            'y': 300,
+            'player_number': player_number
+        }
+        pvp_room['player_order'].append(sid)
+
+        # Get opponent if exists
+        opponent = get_pvp_opponent(sid)
+
+        # Send room state to joining player
+        emit('pvp_room_state', {
+            'playerCount': get_pvp_player_count(),
+            'playerNumber': player_number,
+            'opponent': opponent
+        })
+
+        # Notify opponent if one exists
+        if opponent:
+            emit('pvp_opponent_joined', {
+                'opponent': {
+                    'username': username,
+                    'character': character,
+                    'bullets': bullets,
+                    'lives': lives
+                }
+            }, room=PVP_ROOM_NAME, include_self=False)
+
+        # Broadcast status update to all clients
+        broadcast_pvp_status()
+
+        print(f"[PVP] Player {username} ({sid}) joined arena. Total players: {get_pvp_player_count()}")
+
+    @socketio.on('pvp_ready')
+    def handle_pvp_ready(data):
+        """Handle player ready status"""
+        sid = request.sid
+
+        if sid not in pvp_room['players']:
+            return
+
+        pvp_room['ready_players'].add(sid)
+
+        # Check if both players are ready
+        if len(pvp_room['ready_players']) >= 2 and get_pvp_player_count() >= 2:
+            pvp_room['battle_active'] = True
+            emit('pvp_battle_start', {}, room=PVP_ROOM_NAME)
+            print(f"[PVP] Battle starting!")
+
+    @socketio.on('pvp_move')
+    def handle_pvp_move(data):
+        """Handle player position update"""
+        sid = request.sid
+        x = data.get('x')
+        y = data.get('y')
+
+        if sid not in pvp_room['players']:
+            return
+
+        pvp_room['players'][sid]['x'] = x
+        pvp_room['players'][sid]['y'] = y
+
+        # Broadcast to opponent
+        emit('pvp_opponent_position', {
+            'x': x,
+            'y': y
+        }, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_shoot')
+    def handle_pvp_shoot(data):
+        """Handle player shooting"""
+        sid = request.sid
+
+        if sid not in pvp_room['players']:
+            return
+
+        # Broadcast shot to opponent
+        emit('pvp_opponent_shot', {
+            'bulletX': data.get('bulletX'),
+            'bulletY': data.get('bulletY'),
+            'dx': data.get('dx'),
+            'dy': data.get('dy'),
+            'character': data.get('character')
+        }, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_hit_opponent')
+    def handle_pvp_hit_opponent(data):
+        """Handle player hitting opponent"""
+        sid = request.sid
+
+        if sid not in pvp_room['players']:
+            return
+
+        # Find opponent
+        opponent = get_pvp_opponent(sid)
+        if not opponent:
+            return
+
+        opponent_sid = opponent['sid']
+        if opponent_sid not in pvp_room['players']:
+            return
+
+        # Reduce opponent lives
+        pvp_room['players'][opponent_sid]['lives'] -= 1
+        new_lives = pvp_room['players'][opponent_sid]['lives']
+
+        # Broadcast hit to both players
+        emit('pvp_player_hit', {
+            'target': opponent_sid,
+            'lives': new_lives
+        }, room=PVP_ROOM_NAME)
+
+        print(f"[PVP] Player hit! Opponent lives: {new_lives}")
+
+        # Check if opponent died
+        if new_lives <= 0:
+            # Battle over - attacker wins
+            pvp_room['battle_active'] = False
+            pvp_room['ready_players'].clear()
+            print(f"[PVP] Battle over! Player {pvp_room['players'][sid]['username']} wins!")
+
+    @socketio.on('pvp_stats_update')
+    def handle_pvp_stats_update(data):
+        """Handle player stats update"""
+        sid = request.sid
+
+        if sid not in pvp_room['players']:
+            return
+
+        if data.get('bullets') is not None:
+            pvp_room['players'][sid]['bullets'] = data.get('bullets')
+        if data.get('lives') is not None:
+            pvp_room['players'][sid]['lives'] = data.get('lives')
+
+        # Broadcast to opponent
+        emit('pvp_opponent_stats', {
+            'bullets': pvp_room['players'][sid]['bullets'],
+            'lives': pvp_room['players'][sid]['lives']
+        }, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_chat_send')
+    def handle_pvp_chat_send(data):
+        """Handle chat message in PVP arena"""
+        sid = request.sid
+        content = data.get('content', '')
+        username = data.get('username', 'Anonymous')
+        character = data.get('character', 'knight')
+
+        if not content:
+            return
+
+        # Sanitize content
+        content = content[:280]
+
+        emit('pvp_chat_message', {
+            'username': username,
+            'character': character,
+            'content': content
+        }, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_player_away')
+    def handle_pvp_player_away(data):
+        """Handle player switching away"""
+        username = data.get('username', 'Unknown')
+        emit('pvp_player_away', {'username': username}, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_player_returned')
+    def handle_pvp_player_returned(data):
+        """Handle player returning"""
+        username = data.get('username', 'Unknown')
+        emit('pvp_player_returned', {'username': username}, room=PVP_ROOM_NAME, include_self=False)
+
+    @socketio.on('pvp_leave')
+    def handle_pvp_leave(data):
+        """Handle player leaving PVP arena"""
+        sid = request.sid
+        cleanup_pvp_player(sid)
+
+    def cleanup_pvp_player(sid):
+        """Clean up a player from PVP arena"""
+        if sid not in pvp_room['players']:
+            return
+
+        player = pvp_room['players'][sid]
+        username = player['username']
+
+        # Remove from room
+        del pvp_room['players'][sid]
+        if sid in pvp_room['player_order']:
+            pvp_room['player_order'].remove(sid)
+        pvp_room['ready_players'].discard(sid)
+
+        # Clean up mapping
+        if sid in pvp_sid_mapping:
+            del pvp_sid_mapping[sid]
+
+        leave_room(PVP_ROOM_NAME)
+
+        player_count = get_pvp_player_count()
+
+        # Notify opponent
+        emit('pvp_opponent_left', {
+            'username': username
+        }, room=PVP_ROOM_NAME)
+
+        # Reset battle state if battle was active
+        if pvp_room['battle_active']:
+            pvp_room['battle_active'] = False
+            pvp_room['ready_players'].clear()
+
+        # Broadcast status update
+        broadcast_pvp_status()
+
+        print(f"[PVP] Player {username} ({sid}) left arena. Remaining: {player_count}")

@@ -887,6 +887,10 @@ def init_boss_battle_socket(socketio):
         # Get opponent if exists
         opponent = get_pvp_opponent(sid)
 
+        print(f"[PVP] Player {username} ({sid}) joining. Player number: {player_number}")
+        print(f"[PVP] Current players in room: {list(pvp_room['players'].keys())}")
+        print(f"[PVP] Opponent found: {opponent}")
+
         # Send room state to joining player
         emit('pvp_room_state', {
             'playerCount': get_pvp_player_count(),
@@ -896,13 +900,15 @@ def init_boss_battle_socket(socketio):
 
         # Notify opponent if one exists
         if opponent:
+            opponent_data = {
+                'username': username,
+                'character': character,
+                'bullets': bullets,
+                'lives': lives
+            }
+            print(f"[PVP] Notifying opponent {opponent['username']} about new player: {opponent_data}")
             emit('pvp_opponent_joined', {
-                'opponent': {
-                    'username': username,
-                    'character': character,
-                    'bullets': bullets,
-                    'lives': lives
-                }
+                'opponent': opponent_data
             }, room=PVP_ROOM_NAME, include_self=False)
 
         # Broadcast status update to all clients

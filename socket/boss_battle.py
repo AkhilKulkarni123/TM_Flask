@@ -170,6 +170,39 @@ def init_boss_battle_socket(socketio):
             }
         }, room=room_id, include_self=False)
 
+    # ==================== PLAYER SHOOT (BULLET FIRED) ====================
+    @socketio.on('boss_player_shoot')
+    def handle_player_shoot(data):
+        """Handle player shooting a bullet - broadcast to all other players"""
+        room_id = data.get('room_id')
+        bullet_x = data.get('x')
+        bullet_y = data.get('y')
+        direction = data.get('direction', 'up')  # up, down, left, right
+        bullet_id = data.get('bullet_id')  # unique id for this bullet
+        sid = request.sid
+
+        if not room_id or room_id not in boss_battles:
+            return
+
+        if sid not in boss_battles[room_id]['players']:
+            return
+
+        player = boss_battles[room_id]['players'][sid]
+
+        # Check if player is alive
+        if player.get('status') != 'alive':
+            return
+
+        # Broadcast bullet to all OTHER players in the room
+        emit('boss_player_bullet', {
+            'sid': sid,
+            'username': player.get('username', 'Unknown'),
+            'bullet_id': bullet_id,
+            'x': bullet_x,
+            'y': bullet_y,
+            'direction': direction
+        }, room=room_id, include_self=False)
+
     # ==================== BOSS DAMAGE ====================
     @socketio.on('boss_damage')
     def handle_boss_damage(data):

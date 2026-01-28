@@ -190,6 +190,87 @@ class ActivePlayersAPI(Resource):
         }, 200
 
 
+class ChampionsAPI(Resource):
+    """Get all players who have completed the game"""
+    def get(self):
+        # Get all players with game_status='completed', ordered by completion time
+        champions = SnakesGameData.query.filter_by(
+            game_status='completed'
+        ).order_by(SnakesGameData.completed_at.asc()).all()
+
+        champions_list = []
+        for champion in champions:
+            champions_list.append({
+                "user_id": champion.user_id,
+                "username": champion.username,
+                "character": champion.selected_character,
+                "total_bullets": champion.total_bullets,
+                "time_played": champion.time_played,
+                "completed_at": champion.completed_at.isoformat() if champion.completed_at else None
+            })
+
+        return {
+            "champions": champions_list,
+            "count": len(champions_list)
+        }, 200
+
+
+class CompleteGameAPI(Resource):
+    """Mark the game as completed for the current user"""
+    @token_required()
+    def post(self):
+        current_user = g.current_user
+        game_data = SnakesGameData.query.filter_by(user_id=current_user.id).first()
+
+        if not game_data:
+            return {"message": "Game data not found"}, 404
+
+        # Mark game as completed
+        game_data.game_status = 'completed'
+        game_data.completed_at = datetime.utcnow()
+        db.session.commit()
+
+        return {
+            "message": "Congratulations! Game completed!",
+            "data": game_data.read()
+        }, 200
+
+
+class ResetProgressAPI(Resource):
+    """Reset all game progress for the current user to start fresh"""
+    @token_required()
+    def post(self):
+        current_user = g.current_user
+        game_data = SnakesGameData.query.filter_by(user_id=current_user.id).first()
+
+        if not game_data:
+            return {"message": "Game data not found"}, 404
+
+        # Preserve champion status if they completed before
+        was_champion = game_data.game_status == 'completed'
+
+        # Reset all progress
+        game_data.current_square = 1
+        game_data.visited_squares = [1]
+        game_data.total_bullets = 0
+        game_data.time_played = 0.0
+        game_data.lives = 3
+        game_data.boss_battle_attempts = 0
+        game_data.completed_lessons = []
+        game_data.unlocked_sections = ['half1']
+        game_data.selected_character = 'default'  # Reset character so they can choose again
+        game_data.game_status = 'active'
+        # Keep completed_at if they were a champion (for hall of fame)
+
+        db.session.commit()
+
+        return {
+            "message": "Progress reset successfully! Starting fresh.",
+            "was_champion": was_champion,
+            "data": game_data.read()
+        }, 200
+
+
 api.add_resource(SnakesGameAPI, "/")
 api.add_resource(LeaderboardAPI, "/leaderboard")
 api.add_resource(AddBulletsAPI, "/add-bullets")
@@ -197,3 +278,6 @@ api.add_resource(UpdateSquareAPI, "/update-square")
 api.add_resource(ResetPositionAPI, "/reset-position")
 api.add_resource(GetUnvisitedSquaresAPI, "/unvisited-squares")
 api.add_resource(ActivePlayersAPI, "/active-players")
+api.add_resource(ChampionsAPI, "/champions")
+api.add_resource(CompleteGameAPI, "/complete")
+api.add_resource(ResetProgressAPI, "/reset")

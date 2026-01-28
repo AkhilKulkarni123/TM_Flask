@@ -32,6 +32,7 @@ class SnakesGameData(db.Model):
     visited_squares = Column(MutableList.as_mutable(JSON), default=lambda: [1])
     lives = Column(Integer, default=3)
     game_status = Column(String(50), default='active')
+    completed_at = Column(DateTime, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # NEW FIELDS
     # completed_lessons stores integers identifying lesson rows (1–5) that
@@ -73,6 +74,7 @@ class SnakesGameData(db.Model):
             'visited_squares': self.visited_squares or [],
             'lives': self.lives,
             'game_status': self.game_status,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'completed_lessons': self.completed_lessons or [],
             'unlocked_sections': self.unlocked_sections or ['half1'],
             'last_updated': self.last_updated.isoformat() if self.last_updated else None

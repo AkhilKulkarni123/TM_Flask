@@ -359,7 +359,7 @@ $(document).ready(function () {
         }
     });
 
-    // Save game data button
+    // Save game data button, talk to mort starting here
     $(document).on('click', '.save-game-btn', async function() {
         const userId = $(this).data('id');
         const bullets = parseInt($(`#bullets-${userId}`).val()) || 0;

@@ -632,7 +632,7 @@ def update_game_data(user_id):
         game_data.update(update_dict)
     
     return jsonify(game_data.read()), 200
-
+#Talk to mort starting here
 @app.route('/api/snakes_game/<int:user_id>', methods=['DELETE'])
 @login_required
 def delete_game_data(user_id):

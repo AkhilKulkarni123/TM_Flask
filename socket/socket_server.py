@@ -51,9 +51,8 @@ def handle_get_leaderboard():
 def handle_connect():
     print(f"[SOCKET] Client connected: {__import__('flask').request.sid}")
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print(f"[SOCKET] Client disconnected: {__import__('flask').request.sid}")
+# NOTE: disconnect handler is in boss_battle.py to properly clean up battle rooms
+# Do NOT add a duplicate disconnect handler here
 
 
 # this runs the flask application on the development server

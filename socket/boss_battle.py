@@ -12,6 +12,9 @@ sid_to_room = {}  # { sid: room_id }
 # Lobby members for pre-battle chat - { sid: { username, character } }
 lobby_members = {}
 
+# Shared lobby room name (moved to module level for proper scope)
+LOBBY_ROOM = 'boss_lobby'
+
 MAX_PLAYERS_PER_ROOM = 10
 
 def init_boss_battle_socket(socketio):
@@ -331,12 +334,17 @@ def init_boss_battle_socket(socketio):
         print(f"[BOSS] Player {username} ({sid}) returned to room {room_id}")
 
     # ==================== LOBBY (PRE-BATTLE CHAT) ====================
+    # Note: LOBBY_ROOM is defined at module level for proper scope
+
     @socketio.on('boss_join_lobby')
     def handle_join_lobby(data):
         """Handle player joining the lobby for pre-battle chat"""
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
         sid = request.sid
+
+        # Join the lobby socket room
+        join_room(LOBBY_ROOM)
 
         # Track lobby member
         lobby_members[sid] = {
@@ -352,18 +360,26 @@ def init_boss_battle_socket(socketio):
             'players': [{'sid': s, **p} for s, p in lobby_members.items()]
         })
 
-        # Notify others in lobby via direct emit
+        # Notify others in lobby via room broadcast
         message_data = {
             'sid': sid,
             'username': 'System',
             'character': 'knight',
             'content': f'{username} joined the lobby'
         }
-        for member_sid in list(lobby_members.keys()):
-            if member_sid != sid:
-                socketio.emit('boss_chat_message', message_data, to=member_sid)
-                # Also send updated player count to all other members
-                socketio.emit('boss_lobby_player_count', {'playerCount': lobby_count}, to=member_sid)
+        emit('boss_chat_message', message_data, room=LOBBY_ROOM, include_self=False)
+
+        # Send current lobby members list to the joining player
+        members_list = [{'sid': s, **m} for s, m in lobby_members.items()]
+        emit('boss_lobby_members', {
+            'members': members_list
+        })
+        
+        # Also broadcast updated member list and player count to all lobby members
+        emit('boss_lobby_members', {
+            'members': members_list
+        }, room=LOBBY_ROOM, include_self=False)
+        emit('boss_lobby_player_count', {'playerCount': lobby_count}, room=LOBBY_ROOM, include_self=False)
 
         print(f"[BOSS] Player {username} ({sid}) joined lobby for chat. Lobby size: {lobby_count}")
 
@@ -375,21 +391,26 @@ def init_boss_battle_socket(socketio):
         if sid in lobby_members:
             username = lobby_members[sid].get('username', 'Unknown')
             del lobby_members[sid]
-
-            lobby_count = len(lobby_members)
-
-            # Notify remaining lobby members
-            message_data = {
-                'sid': sid,
-                'username': 'System',
-                'character': 'knight',
-                'content': f'{username} left the lobby'
-            }
-            for member_sid in list(lobby_members.keys()):
-                socketio.emit('boss_chat_message', message_data, to=member_sid)
-                socketio.emit('boss_lobby_player_count', {'playerCount': lobby_count}, to=member_sid)
-
-            print(f"[BOSS] Player {username} ({sid}) left lobby. Lobby size: {lobby_count}")
+        leave_room(LOBBY_ROOM)
+        
+        lobby_count = len(lobby_members)
+        
+        # Notify remaining lobby members
+        message_data = {
+            'sid': sid,
+            'username': 'System',
+            'character': 'knight',
+            'content': f'{username} left the lobby'
+        }
+        emit('boss_chat_message', message_data, room=LOBBY_ROOM)
+        
+        # Send updated member list and player count to remaining members
+        emit('boss_lobby_members', {
+            'members': [{'sid': s, **m} for s, m in lobby_members.items()]
+        }, room=LOBBY_ROOM)
+        emit('boss_lobby_player_count', {'playerCount': lobby_count}, room=LOBBY_ROOM)
+        
+        print(f"[BOSS] Player {username} ({sid}) left lobby. Lobby size: {lobby_count}")
 
     # ==================== CHAT MESSAGE ====================
     @socketio.on('boss_chat_send')
@@ -399,59 +420,67 @@ def init_boss_battle_socket(socketio):
         content = data.get('content', '')
         sid = request.sid
 
+        print(f"[CHAT DEBUG] Received chat from {sid}, room_id={room_id}, content={content[:50] if content else 'empty'}")
+        print(f"[CHAT DEBUG] Current boss_battles keys: {list(boss_battles.keys())}")
+        print(f"[CHAT DEBUG] Current lobby_members: {list(lobby_members.keys())}")
+        print(f"[CHAT DEBUG] sid_to_room mapping: {sid} -> {sid_to_room.get(sid, 'NOT FOUND')}")
+
         if not content:
+            print(f"[CHAT DEBUG] No content, ignoring")
             return
 
         # Sanitize content (basic length limit)
         content = content[:280]
 
-        # For battle rooms, verify player is in the room and use stored player data
-        if room_id and room_id in boss_battles and boss_battles[room_id].get('players'):
-            if sid not in boss_battles[room_id]['players']:
-                print(f"[CHAT] Player {sid} not in room {room_id}")
-                return
+        # Get player info - check if they're in a battle room first
+        username = data.get('username', 'Anonymous')
+        character = data.get('character', 'knight')
+        in_battle_room = False
+        actual_room_id = None
 
-            # Get player info from stored data (prevents spoofing)
-            player = boss_battles[room_id]['players'][sid]
-            username = player.get('username', 'Anonymous')
-            character = player.get('character', 'knight')
+        # First, check if player is tracked in sid_to_room (most reliable)
+        if sid in sid_to_room:
+            actual_room_id = sid_to_room[sid]
+            if actual_room_id in boss_battles and sid in boss_battles[actual_room_id]['players']:
+                player = boss_battles[actual_room_id]['players'][sid]
+                username = player.get('username', 'Anonymous')
+                character = player.get('character', 'knight')
+                in_battle_room = True
+                print(f"[CHAT DEBUG] Player {username} found via sid_to_room in {actual_room_id}")
 
-            message_data = {
-                'sid': sid,
-                'username': username,
-                'character': character,
-                'content': content
-            }
+        # Fallback: check if player is in the room they specified
+        if not in_battle_room and room_id and room_id in boss_battles:
+            if sid in boss_battles[room_id]['players']:
+                player = boss_battles[room_id]['players'][sid]
+                username = player.get('username', 'Anonymous')
+                character = player.get('character', 'knight')
+                in_battle_room = True
+                actual_room_id = room_id
+                print(f"[CHAT DEBUG] Player {username} found in specified room {room_id}")
 
-            # Emit to all OTHER players in the room (sender already shows message locally)
-            for player_sid in list(boss_battles[room_id]['players'].keys()):
-                if player_sid != sid:  # Exclude sender to avoid duplicate
-                    socketio.emit('boss_chat_message', message_data, to=player_sid)
+        message_data = {
+            'sid': sid,
+            'username': username,
+            'character': character,
+            'content': content,
+            'room_id': actual_room_id or room_id
+        }
 
+        if in_battle_room and actual_room_id:
+            # Use room-based broadcast for battle rooms (exclude sender - they show message locally)
+            emit('boss_chat_message', message_data, room=actual_room_id, include_self=False)
             print(f"[CHAT-BATTLE] {username}: {content[:50]}...")
-        else:
-            # For lobby, emit to all OTHER lobby members (sender already shows message locally)
-            if sid not in lobby_members:
-                print(f"[CHAT] Player {sid} not in lobby")
-                return
-
-            # Get player info from stored lobby data (prevents spoofing)
-            member = lobby_members[sid]
-            username = member.get('username', 'Anonymous')
-            character = member.get('character', 'knight')
-
-            message_data = {
-                'sid': sid,
-                'username': username,
-                'character': character,
-                'content': content
-            }
-
-            for member_sid in list(lobby_members.keys()):
-                if member_sid != sid:  # Exclude sender to avoid duplicate
-                    socketio.emit('boss_chat_message', message_data, to=member_sid)
-
+        elif room_id == 'lobby' or room_id == LOBBY_ROOM or not room_id:
+            # For lobby, use the lobby room broadcast (exclude sender)
+            emit('boss_chat_message', message_data, room=LOBBY_ROOM, include_self=False)
             print(f"[CHAT-LOBBY] {username}: {content[:50]}...")
+        elif room_id:
+            # Fallback: player sent room_id but room doesn't exist yet or they're not in it
+            emit('boss_chat_message', message_data, room=room_id, include_self=False)
+            print(f"[CHAT] Fallback broadcast to room {room_id} - {username}: {content[:50]}...")
+        else:
+            # Last resort: no room found
+            print(f"[CHAT] No room found for {username}, message not sent")
 
     # ==================== LEAVE ROOM ====================
     @socketio.on('boss_leave_room')
@@ -502,6 +531,7 @@ def init_boss_battle_socket(socketio):
     def handle_disconnect():
         """Clean up player from any active battles and lobby on disconnect"""
         sid = request.sid
+        print(f"[SOCKET] Client disconnected: {sid}")
 
         # Find which room this player was in
         room_id = sid_to_room.get(sid)
@@ -540,6 +570,18 @@ def init_boss_battle_socket(socketio):
         if sid in lobby_members:
             username = lobby_members[sid].get('username', 'Unknown')
             del lobby_members[sid]
+            # Notify remaining lobby members
+            message_data = {
+                'sid': sid,
+                'username': 'System',
+                'character': 'knight',
+                'content': f'{username} disconnected'
+            }
+            emit('boss_chat_message', message_data, room=LOBBY_ROOM)
+            # Send updated member list
+            emit('boss_lobby_members', {
+                'members': [{'sid': s, **m} for s, m in lobby_members.items()]
+            }, room=LOBBY_ROOM)
 
             lobby_count = len(lobby_members)
 
@@ -687,3 +729,64 @@ def init_boss_battle_socket(socketio):
         """Legacy handler for leave_boss_battle"""
         data['room_id'] = data.get('room_id', 'boss_battle_room')
         handle_leave_room(data)
+
+    # ==================== DEBUG UTILITIES ====================
+    @socketio.on('boss_debug_state')
+    def handle_debug_state(data):
+        """Return current server state for debugging"""
+        sid = request.sid
+        current_rooms = rooms(sid)
+        
+        emit('boss_debug_response', {
+            'your_sid': sid,
+            'your_rooms': list(current_rooms),
+            'boss_battles': {
+                room_id: {
+                    'boss_health': room_data['boss_health'],
+                    'player_count': len(room_data['players']),
+                    'player_sids': list(room_data['players'].keys()),
+                    'player_names': [p['username'] for p in room_data['players'].values()]
+                }
+                for room_id, room_data in boss_battles.items()
+            },
+            'lobby_member_count': len(lobby_members),
+            'lobby_sids': list(lobby_members.keys()),
+            'sid_to_room': dict(sid_to_room)
+        })
+        print(f"[DEBUG] State requested by {sid}")
+
+    # ==================== GET ONLINE PLAYERS ====================
+    @socketio.on('boss_get_players')
+    def handle_get_players(data):
+        """Get list of online players in a room or lobby"""
+        room_id = data.get('room_id')
+        sid = request.sid
+
+        if room_id == 'lobby' or room_id == LOBBY_ROOM:
+            # Return lobby members
+            emit('boss_lobby_members', {
+                'members': [{'sid': s, **m} for s, m in lobby_members.items()]
+            })
+        elif room_id and room_id in boss_battles:
+            # Return battle room players
+            emit('boss_room_players', {
+                'room_id': room_id,
+                'players': get_room_players_list(room_id),
+                'playerCount': len(boss_battles[room_id]['players'])
+            })
+        else:
+            # Try to find the room the player is in via sid_to_room
+            player_room = sid_to_room.get(sid)
+            if player_room and player_room in boss_battles:
+                emit('boss_room_players', {
+                    'room_id': player_room,
+                    'players': get_room_players_list(player_room),
+                    'playerCount': len(boss_battles[player_room]['players'])
+                })
+            else:
+                emit('boss_room_players', {
+                    'room_id': None,
+                    'players': [],
+                    'playerCount': 0,
+                    'error': 'Not in a room'
+                })

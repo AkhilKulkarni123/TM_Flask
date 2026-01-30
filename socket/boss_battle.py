@@ -927,6 +927,13 @@ def init_boss_battle_socket(socketio):
                 'opponent': new_player_data,
                 'playerCount': get_pvp_player_count()
             }, to=existing_opponent['sid'])
+            # Also send a full room state snapshot to the existing opponent
+            # to avoid clients getting stuck in "waiting" if they miss the join event.
+            socketio.emit('pvp_room_state', {
+                'playerCount': get_pvp_player_count(),
+                'playerNumber': existing_opponent.get('player_number', 1),
+                'opponent': new_player_data
+            }, to=existing_opponent['sid'])
 
         # Broadcast status update to all clients
         broadcast_pvp_status()

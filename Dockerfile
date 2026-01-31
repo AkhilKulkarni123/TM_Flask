@@ -14,19 +14,21 @@ RUN apt-get update && \
 COPY requirements.txt .
 
 # Install Python dependencies with no cache
+# Install eventlet for Socket.IO WebSocket support
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn
+    pip install --no-cache-dir gunicorn eventlet
 
 # Copy rest of app code
 COPY . /app
 
 # Environment variables
+# Use eventlet worker for WebSocket support with Socket.IO
 ENV FLASK_ENV=production \
-    GUNICORN_CMD_ARGS="--workers=5 --threads=2 --bind=0.0.0.0:8306 --timeout=30 --access-logfile -"
+    GUNICORN_CMD_ARGS="--worker-class eventlet --workers=1 --bind=0.0.0.0:8306 --timeout=120 --access-logfile -"
 
 # Expose port
 EXPOSE 8306
 
-# Start server
-CMD ["gunicorn", "main:app"]
+# Start server with Socket.IO app
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:8306", "main:app"]

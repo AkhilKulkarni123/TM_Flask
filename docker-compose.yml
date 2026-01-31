@@ -10,11 +10,14 @@ services:
                 volumes:
                         - ./instance:/app/instance
                 restart: unless-stopped
+                # Note: Socket.IO is now integrated into the main Flask app
+                # No separate socketio service needed
 
-        socketio:
-                image: socket_open
-                build: ./socket
-                ports:
-                        - "8500:8500"
-    
-                restart: unless-stopped
+        # Legacy socketio service - kept for backwards compatibility
+        # Can be removed if not needed
+        # socketio:
+        #         image: socket_open
+        #         build: ./socket
+        #         ports:
+        #                 - "8500:8500"
+        #         restart: unless-stopped

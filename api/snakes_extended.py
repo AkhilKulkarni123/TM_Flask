@@ -112,7 +112,7 @@ def answer_question():
         return jsonify({'error': str(e)}), 500
 
 
-@snakes_bp.route('/', methods=['PUT'])
+@snakes_bp.route('/update-game', methods=['PUT'])
 @token_required()
 def update_snakes_game():
     """Update the user's game state (current_square, visited_squares, etc.)."""
@@ -129,7 +129,9 @@ def update_snakes_game():
         return jsonify({'error': str(e)}), 500
 
 
-@snakes_bp.route('/leaderboard', methods=['GET'])
+# Note: /leaderboard route is already defined in snakes_game.py (snakes_game_api blueprint)
+# Using /extended-leaderboard to avoid conflict
+@snakes_bp.route('/extended-leaderboard', methods=['GET'])
 def leaderboard():
     """Return a simple leaderboard sorted by bullets."""
     try:

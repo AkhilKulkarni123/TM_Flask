@@ -24,7 +24,10 @@ from api.boss_battle import boss_api
 from api.admin import admin_api
 
 # import "objects" from "this" project
-from __init__ import app, db, login_manager
+from __init__ import app, db, login_manager, socketio
+
+# Import boss battle socket handlers
+from socket.boss_battle import init_boss_battle_socket
 
 # API endpoints
 from api.user import user_api 
@@ -85,15 +88,27 @@ CORS(
         "http://127.0.0.1:4600",
         "http://localhost:4000",
         "http://127.0.0.1:4000",
-        # Production deployments
-        "https://open-coding-society.github.io",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:8500",
+        "http://127.0.0.1:8500",
+        # Production deployments - OpenCodingSociety domains
         "https://pages.opencodingsociety.com",
-        "https://akhilkulkarni123.github.io",
+        "http://pages.opencodingsociety.com",
         "https://snakes.opencodingsociety.com",
+        "http://snakes.opencodingsociety.com",
+        "https://spring.opencodingsociety.com",
+        "http://spring.opencodingsociety.com",
+        "https://api.opencodingsociety.com",
+        "http://api.opencodingsociety.com",
+        # GitHub Pages
+        "https://open-coding-society.github.io",
+        "https://akhilkulkarni123.github.io",
+        "https://nighthawkcoders.github.io",
     ],
-    allow_headers=["Content-Type", "Authorization", "X-Origin"],
-    expose_headers=["Set-Cookie"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Origin", "Cookie", "X-Requested-With", "Accept"],
+    expose_headers=["Set-Cookie", "Content-Type"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 )
 
 # ============================================================================
@@ -190,6 +205,12 @@ app.register_blueprint(snakes_bp)
 with app.app_context():
     initJokes()
     SnakesGameData.initSnakesGame()
+
+# ============================================================================
+# INITIALIZE SOCKET.IO HANDLERS
+# ============================================================================
+# Initialize boss battle and PVP socket handlers
+init_boss_battle_socket(socketio)
 
 # ============================================================================
 # FLASK-LOGIN CONFIGURATION
@@ -314,9 +335,27 @@ def logout():
 def health_check():
     """API health check endpoint"""
     return jsonify({
-        "status": "ok", 
+        "status": "ok",
         "message": "Backend is running",
         "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+@app.route('/api/debug/routes', methods=['GET'])
+def debug_routes():
+    """Debug endpoint to list all registered routes"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods - {'HEAD', 'OPTIONS'}),
+            'path': str(rule)
+        })
+    # Filter to show only snakes-related routes
+    snakes_routes = [r for r in routes if 'snakes' in r['path'].lower()]
+    return jsonify({
+        "total_routes": len(routes),
+        "snakes_routes": snakes_routes,
+        "all_routes": sorted(routes, key=lambda x: x['path'])
     }), 200
 
 @app.route('/api')
@@ -673,9 +712,11 @@ if __name__ == "__main__":
     host = "0.0.0.0"
     port = int(os.getenv('FLASK_PORT', 8306))
     print(f"\n{'='*60}")
-    print(f"🚀 Server running: http://localhost:{8306}")
-    print(f"📡 API endpoints: http://localhost:{8306}/api")
-    print(f"🎮 Game board: http://localhost:{8306}/game-board")
-    print(f"🔐 Login: http://localhost:{8306}/login")
+    print(f"🚀 Server running: http://localhost:{port}")
+    print(f"📡 API endpoints: http://localhost:{port}/api")
+    print(f"🔌 Socket.IO: http://localhost:{port}/socket.io/")
+    print(f"🎮 Game board: http://localhost:{port}/game-board")
+    print(f"🔐 Login: http://localhost:{port}/login")
     print(f"{'='*60}\n")
-    app.run(debug=True, host="0.0.0.0", port=8306, use_reloader=False)
+    # Use socketio.run() instead of app.run() to enable WebSocket support
+    socketio.run(app, debug=True, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)

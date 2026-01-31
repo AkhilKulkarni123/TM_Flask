@@ -3,6 +3,7 @@ from flask_login import LoginManager
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_socketio import SocketIO
 from dotenv import load_dotenv
 import os
 
@@ -11,6 +12,27 @@ load_dotenv()
 
 # Setup of key Flask object (app)
 app = Flask(__name__)
+
+# Initialize Flask-SocketIO for real-time multiplayer
+# CORS is set to * to allow all origins for socket connections
+# async_mode is set to 'eventlet' for production (gunicorn with eventlet worker)
+# Falls back to 'threading' in development if eventlet is not available
+try:
+    import eventlet
+    eventlet.monkey_patch()
+    async_mode = 'eventlet'
+except ImportError:
+    async_mode = 'threading'
+
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=async_mode,
+    logger=False,
+    engineio_logger=False,
+    ping_timeout=60,
+    ping_interval=25
+)
 
 # Configure Flask Port, default to 8301 which is same as Docker setup
 app.config['FLASK_PORT'] = int(os.environ.get('FLASK_PORT') or 8306)

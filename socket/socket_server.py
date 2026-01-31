@@ -1,15 +1,47 @@
 # imports from flask
 from flask_socketio import SocketIO, send, emit
-from flask import Flask
+from flask import Flask, jsonify
+from flask_cors import CORS
 
 # Import boss battle socket handlers
 from boss_battle import init_boss_battle_socket
 
 app = Flask(__name__)
 
+# Add CORS support for the Flask app
+CORS(app, origins="*", supports_credentials=True)
+
 # Socket.IO server - runs on port 8500 for real-time multiplayer
-# Allow all origins in development for easier testing
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Allow all origins for cross-domain socket connections
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
+)
+
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    return jsonify({
+        'status': 'ok',
+        'service': 'socket-server',
+        'message': 'Socket.IO server is running'
+    }), 200
+
+@app.route('/')
+def index():
+    return jsonify({
+        'status': 'ok',
+        'service': 'socket-server',
+        'endpoints': {
+            'health': '/health',
+            'socket': 'ws://host:port/socket.io/'
+        }
+    }), 200
 
 # Initialize boss battle socket handlers
 init_boss_battle_socket(socketio)

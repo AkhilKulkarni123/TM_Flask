@@ -860,8 +860,11 @@ def init_boss_battle_socket(socketio):
         bullets = data.get('bullets', 0)
         lives = data.get('lives', 3)
 
-        # Check if room is full
-        if get_pvp_player_count() >= MAX_PVP_PLAYERS:
+        print(f"[PVP] Join request from {username} ({sid})")
+        print(f"[PVP] Current room state: players={list(pvp_room['players'].keys())}, count={get_pvp_player_count()}")
+
+        # Check if room is full (and player is NOT already in it)
+        if get_pvp_player_count() >= MAX_PVP_PLAYERS and sid not in pvp_room['players']:
             emit('pvp_room_full', {'message': 'PVP arena is full (max 2 players)'})
             return
 
@@ -877,7 +880,15 @@ def init_boss_battle_socket(socketio):
             return
 
         # Get opponent BEFORE adding new player (to check if someone is already waiting)
-        existing_opponent = get_pvp_opponent(sid)
+        existing_opponent = None
+        existing_opponent_sid = None
+        for player_sid, player_data in pvp_room['players'].items():
+            if player_sid != sid:
+                existing_opponent = {'sid': player_sid, **player_data}
+                existing_opponent_sid = player_sid
+                break
+
+        print(f"[PVP] Existing opponent before join: {existing_opponent}")
 
         # Join the socket room
         join_room(PVP_ROOM_NAME)
@@ -901,9 +912,9 @@ def init_boss_battle_socket(socketio):
         # Get opponent again after adding (for the joining player's room state)
         opponent = get_pvp_opponent(sid)
 
-        print(f"[PVP] Player {username} ({sid}) joining. Player number: {player_number}")
+        print(f"[PVP] Player {username} ({sid}) joined. Player number: {player_number}")
         print(f"[PVP] Current players in room: {list(pvp_room['players'].keys())}")
-        print(f"[PVP] Opponent found: {opponent}")
+        print(f"[PVP] Opponent for new player: {opponent}")
 
         # Send room state to joining player
         emit('pvp_room_state', {
@@ -914,26 +925,35 @@ def init_boss_battle_socket(socketio):
 
         # Notify the existing opponent directly using their socket ID
         # This is more reliable than room-based emit
-        if existing_opponent:
+        if existing_opponent and existing_opponent_sid:
             new_player_data = {
                 'username': username,
                 'character': character,
                 'bullets': bullets,
-                'lives': lives
+                'lives': lives,
+                'player_number': player_number
             }
-            print(f"[PVP] Notifying opponent {existing_opponent['username']} ({existing_opponent['sid']}) about new player: {new_player_data}")
+            print(f"[PVP] Notifying opponent {existing_opponent['username']} ({existing_opponent_sid}) about new player")
+
             # Emit directly to the opponent's socket ID for reliability
             socketio.emit('pvp_opponent_joined', {
                 'opponent': new_player_data,
                 'playerCount': get_pvp_player_count()
-            }, to=existing_opponent['sid'])
+            }, to=existing_opponent_sid)
+
             # Also send a full room state snapshot to the existing opponent
             # to avoid clients getting stuck in "waiting" if they miss the join event.
             socketio.emit('pvp_room_state', {
                 'playerCount': get_pvp_player_count(),
                 'playerNumber': existing_opponent.get('player_number', 1),
                 'opponent': new_player_data
-            }, to=existing_opponent['sid'])
+            }, to=existing_opponent_sid)
+
+            # Also broadcast via room for redundancy
+            socketio.emit('pvp_match_ready', {
+                'message': 'Both players are in the arena!',
+                'playerCount': 2
+            }, room=PVP_ROOM_NAME)
 
         # Broadcast status update to all clients
         broadcast_pvp_status()

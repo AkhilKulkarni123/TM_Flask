@@ -1026,8 +1026,22 @@ def init_boss_battle_socket(socketio):
             # Also broadcast via room for redundancy
             socketio.emit('pvp_match_ready', {
                 'message': 'Both players are in the arena!',
-                'playerCount': 2
+                'playerCount': 2,
+                'player1': pvp_room['players'].get(pvp_room['player_order'][0]) if len(pvp_room['player_order']) > 0 else None,
+                'player2': pvp_room['players'].get(pvp_room['player_order'][1]) if len(pvp_room['player_order']) > 1 else None
             }, room=PVP_ROOM_NAME)
+            
+            print(f"[PVP] Match ready! Sent pvp_match_ready to room {PVP_ROOM_NAME}")
+            
+            # Auto-start battle when 2 players have joined (no need to wait for ready)
+            if get_pvp_player_count() >= 2 and not pvp_room['battle_active']:
+                pvp_room['battle_active'] = True
+                socketio.emit('pvp_battle_start', {
+                    'message': 'Battle starting!',
+                    'player1': pvp_room['players'].get(pvp_room['player_order'][0]) if len(pvp_room['player_order']) > 0 else None,
+                    'player2': pvp_room['players'].get(pvp_room['player_order'][1]) if len(pvp_room['player_order']) > 1 else None
+                }, room=PVP_ROOM_NAME)
+                print(f"[PVP] Auto-started battle!")
 
         # Broadcast status update to all clients
         broadcast_pvp_status()

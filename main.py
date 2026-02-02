@@ -27,7 +27,7 @@ from api.admin import admin_api
 from __init__ import app, db, login_manager, socketio
 
 # Import boss battle socket handlers
-from socket.boss_battle import init_boss_battle_socket
+from socketio_handlers.boss_battle import init_boss_battle_socket
 
 # API endpoints
 from api.user import user_api 

@@ -80,7 +80,7 @@ class BossPlayer(db.Model):
     id = Column(Integer, primary_key=True)
     room_id = Column(Integer, ForeignKey('boss_rooms.id'), nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    lives = Column(Integer, default=3)
+    lives = Column(Integer, default=5)
     bullets_used = Column(Integer, default=0)
     damage_dealt = Column(Integer, default=0)
     is_alive = Column(Boolean, default=True)
@@ -92,7 +92,7 @@ class BossPlayer(db.Model):
     room = relationship("BossRoom", back_populates="players")
     user = relationship("User", backref="boss_battles")
     
-    def __init__(self, room_id, user_id, lives=3):
+    def __init__(self, room_id, user_id, lives=5):
         self.room_id = room_id
         self.user_id = user_id
         self.lives = lives

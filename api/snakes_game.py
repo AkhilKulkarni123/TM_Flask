@@ -254,7 +254,7 @@ class ResetProgressAPI(Resource):
         game_data.visited_squares = [1]
         game_data.total_bullets = 0
         game_data.time_played = 0.0
-        game_data.lives = 3
+        game_data.lives = 5
         game_data.boss_battle_attempts = 0
         game_data.completed_lessons = []
         game_data.unlocked_sections = ['half1']

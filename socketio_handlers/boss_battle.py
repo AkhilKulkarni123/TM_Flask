@@ -59,7 +59,7 @@ def init_boss_battle_socket(socketio):
         user_id = player_data.get('user_id', sid)
         character = player_data.get('character', 'knight')
         bullets = player_data.get('bullets', 0)
-        lives = player_data.get('lives', 3)
+        lives = player_data.get('lives', 5)
         x = player_data.get('x', 400)
         y = player_data.get('y', 500)
 
@@ -806,7 +806,7 @@ def init_boss_battle_socket(socketio):
                 'user_id': user_id,
                 'bullets': bullets,
                 'character': character,
-                'lives': 3,
+                'lives': 5,
                 'x': 400,
                 'y': 500
             },
@@ -932,7 +932,7 @@ def init_boss_battle_socket(socketio):
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
         bullets = data.get('bullets', 0)
-        lives = data.get('lives', 3)
+        lives = data.get('lives', 5)
 
         print(f"[PVP] Join request from {username} ({sid})")
         print(f"[PVP] Current room state: players={list(pvp_room['players'].keys())}, count={get_pvp_player_count()}")

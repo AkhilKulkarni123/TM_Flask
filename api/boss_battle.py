@@ -73,8 +73,8 @@ def join_boss_battle():
                 'player': existing_player.to_dict()
             }), 200
         
-        # Add player to room (use progress lives or default to 3)
-        player_lives = progress.lives if progress else 3
+        # Add player to room (use progress lives or default to 5)
+        player_lives = progress.lives if progress else 5
         player = BossPlayer(room_id=room.id, user_id=user.id, lives=player_lives)
         db.session.add(player)
         

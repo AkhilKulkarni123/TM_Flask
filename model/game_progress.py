@@ -14,7 +14,7 @@ class GameProgress(db.Model):
     current_position = Column(Integer, default=1)
     completed_squares = Column(JSON, default=list)  # List of completed square numbers
     bullets = Column(Integer, default=0)  # Currency collected
-    lives = Column(Integer, default=3)
+    lives = Column(Integer, default=5)
     time_played_minutes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -28,7 +28,7 @@ class GameProgress(db.Model):
         self.current_position = 1
         self.completed_squares = []
         self.bullets = 0
-        self.lives = 3
+        self.lives = 5
         self.time_played_minutes = 0
     
     def to_dict(self):
@@ -93,7 +93,7 @@ class GameProgress(db.Model):
         self.current_position = 1
         self.completed_squares = []
         self.bullets = 0
-        self.lives = 3
+        self.lives = 5
         self.updated_at = datetime.utcnow()
 
 

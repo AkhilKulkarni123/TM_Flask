@@ -30,7 +30,7 @@ class SnakesGameData(db.Model):
     # List of visited squares for this player.  MutableList/JSON allows
     # in‑place modification of the list while persisting to JSON.
     visited_squares = Column(MutableList.as_mutable(JSON), default=lambda: [1])
-    lives = Column(Integer, default=3)
+    lives = Column(Integer, default=5)
     game_status = Column(String(50), default='active')
     completed_at = Column(DateTime, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -120,7 +120,7 @@ class SnakesGameData(db.Model):
         player = SnakesGameData.query.filter_by(user_id=user_id).first()
         if player:
             player.current_square = 1
-            player.lives = 3
+            player.lives = 5
             player.game_status = 'active'
             db.session.commit()
         return player

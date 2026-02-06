@@ -92,6 +92,8 @@ class SnakesGameData(db.Model):
             self.boss_battle_attempts = data['boss_battle_attempts']
         if 'selected_character' in data:
             self.selected_character = data['selected_character']
+        if 'username' in data:
+            self.username = data['username']
         if 'visited_squares' in data:
             self.visited_squares = data['visited_squares']
         if 'completed_lessons' in data:

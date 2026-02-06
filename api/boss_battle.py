@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from flask_cors import CORS
 from model.boss_room import BossRoom, BossPlayer, BossBattleStats
 from model.game_progress import GameProgress
 from model.user import User
 from __init__ import db
 from api.jwt_authorize import token_required
+import jwt
 import json
 import logging
 
@@ -21,21 +22,51 @@ logger = logging.getLogger(__name__)
 active_connections = {}
 
 
+def _get_user_from_token():
+    token = request.cookies.get(current_app.config["JWT_TOKEN_NAME"])
+    if not token:
+        return None
+    try:
+        data = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+        return User.query.filter_by(_uid=data.get("_uid")).first()
+    except Exception:
+        return None
+
+
+def _get_or_create_guest_user(guest_id, guest_name):
+    if not guest_id:
+        return None
+    user = User.query.filter_by(_uid=guest_id).first()
+    if user:
+        return user
+    user = User(name=guest_name or guest_id, uid=guest_id)
+    db.session.add(user)
+    db.session.flush()
+    return user
+
+
 @boss_api.route('/join', methods=['POST'])
-@token_required()
 def join_boss_battle():
     """Join or create a boss battle room"""
     try:
-        user = g.current_user
-
-        # Get player progress (or create if doesn't exist for testing)
-        progress = GameProgress.query.filter_by(user_id=user.id).first()
-
-        # DEV MODE: Skip requirements if 'dev_mode' is passed in request
         data = request.get_json() or {}
         dev_mode = data.get('dev_mode', False)
+        guest_id = data.get('guest_id')
+        guest_name = data.get('guest_name')
 
-        if not dev_mode:
+        user = _get_user_from_token()
+        is_guest = False
+        if not user:
+            if guest_id:
+                user = _get_or_create_guest_user(guest_id, guest_name)
+                is_guest = True
+            else:
+                return jsonify({'error': 'Authentication required'}), 401
+
+        # Get player progress (may be None for guests or new users)
+        progress = GameProgress.query.filter_by(user_id=user.id).first()
+
+        if not dev_mode and not is_guest:
             # Check if player has reached square 25
             if not progress or progress.current_position < 25:
                 return jsonify({'error': 'You must reach square 25 first', 'current_position': progress.current_position if progress else 0}), 403
@@ -218,12 +249,17 @@ def player_hit():
 
 
 @boss_api.route('/leave', methods=['POST'])
-@token_required()
 def leave_battle():
     """Leave the boss battle"""
     try:
-        user = g.current_user
-        data = request.get_json()
+        data = request.get_json() or {}
+        guest_id = data.get('guest_id')
+
+        user = _get_user_from_token()
+        if not user and guest_id:
+            user = User.query.filter_by(_uid=guest_id).first()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
         
         room_id = data.get('room_id')
         

@@ -149,7 +149,12 @@
                 <tr id="user-{{ user.id }}">
                     <td>{{ user.id }}</td>
                     <td>{{ user.uid }}</td>
-                    <td>{{ user.name }}</td>
+                    <td>
+                        <span id="name-display-{{ user.id }}">{{ user.name }}</span>
+                        <input type="text" id="name-input-{{ user.id }}" 
+                               class="form-control" value="{{ user.name }}" 
+                               style="display: none; width: 150px; font-size: 0.9rem;">
+                    </td>
                     <td>{{ user.email }}</td>
                     <td>{{ user.role }}</td>
                     <td>
@@ -208,9 +213,23 @@
                     <td>
                         <div class="btn-group-compact">
                             {% if current_user.role == 'Admin' %}
+                            <button class="btn-sm-custom btn-edit edit-name-btn" 
+                                    data-id="{{ user.id }}" data-uid="{{ user.uid }}">
+                                ✏️ Name
+                            </button>
+                            <button class="btn-sm-custom btn-save save-name-btn" 
+                                    data-id="{{ user.id }}" data-uid="{{ user.uid }}"
+                                    style="display: none;">
+                                💾 Save
+                            </button>
+                            <button class="btn-sm-custom btn-cancel cancel-name-btn" 
+                                    data-id="{{ user.id }}"
+                                    style="display: none;">
+                                ❌ Cancel
+                            </button>
                             <button class="btn-sm-custom btn-edit edit-game-btn" 
                                     data-id="{{ user.id }}" data-uid="{{ user.uid }}">
-                                ✏️ Edit Game
+                                🎮 Game
                             </button>
                             <button class="btn-sm-custom btn-reset reset-password-btn" 
                                     data-id="{{ user.id }}">
@@ -338,6 +357,81 @@ $(document).ready(function () {
     }
 
     processUsers();
+
+    // Edit name button
+    $(document).on('click', '.edit-name-btn', function() {
+        const userId = $(this).data('id');
+        $(`#name-display-${userId}`).hide();
+        $(`#name-input-${userId}`).show();
+        $(`#name-input-${userId}`).focus();
+        
+        // Show save/cancel buttons, hide other buttons
+        $(`.save-name-btn[data-id="${userId}"]`).show();
+        $(`.cancel-name-btn[data-id="${userId}"]`).show();
+        $(`.edit-name-btn[data-id="${userId}"]`).hide();
+        $(`.edit-game-btn[data-id="${userId}"]`).hide();
+    });
+
+    // Cancel name edit button
+    $(document).on('click', '.cancel-name-btn', function() {
+        const userId = $(this).data('id');
+        const originalName = $(`#name-display-${userId}`).text();
+        
+        $(`#name-input-${userId}`).val(originalName);
+        $(`#name-input-${userId}`).hide();
+        $(`#name-display-${userId}`).show();
+        
+        // Hide save/cancel buttons, show other buttons
+        $(`.save-name-btn[data-id="${userId}"]`).hide();
+        $(`.cancel-name-btn[data-id="${userId}"]`).hide();
+        $(`.edit-name-btn[data-id="${userId}"]`).show();
+        $(`.edit-game-btn[data-id="${userId}"]`).show();
+    });
+
+    // Save name button
+    $(document).on('click', '.save-name-btn', async function() {
+        const userId = $(this).data('id');
+        const userUid = $(this).data('uid');
+        const newName = $(`#name-input-${userId}`).val().trim();
+        
+        if (!newName) {
+            alert('❌ Name cannot be empty!');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/admin/player/${userId}/modify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: newName
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update display
+                $(`#name-display-${userId}`).text(data.user.username);
+                $(`#name-input-${userId}`).hide();
+                $(`#name-display-${userId}`).show();
+                
+                // Hide save/cancel buttons, show other buttons
+                $(`.save-name-btn[data-id="${userId}"]`).hide();
+                $(`.cancel-name-btn[data-id="${userId}"]`).hide();
+                $(`.edit-name-btn[data-id="${userId}"]`).show();
+                $(`.edit-game-btn[data-id="${userId}"]`).show();
+                
+                alert('✅ Name updated successfully!');
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update name');
+            }
+        } catch (error) {
+            console.error('Error updating name:', error);
+            alert('❌ Error updating name: ' + error.message);
+        }
+    });
 
     // Edit game data button
     $(document).on('click', '.edit-game-btn', function() {

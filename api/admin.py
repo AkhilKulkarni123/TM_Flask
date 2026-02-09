@@ -124,6 +124,7 @@ def get_all_players():
                     'lives': progress.lives,
                     'time_played_minutes': progress.time_played_minutes,
                     'time_played_formatted': f"{progress.time_played_minutes // 60}h {progress.time_played_minutes % 60}m",
+                    'character': user.grade_data.get('character', 'mario') if user.grade_data else 'mario',
                     'created_at': progress.created_at.isoformat() if progress.created_at else None,
                     'last_updated': progress.updated_at.isoformat() if progress.updated_at else None
                 }
@@ -298,20 +299,39 @@ def modify_player_stats(user_id):
         if not progress:
             return jsonify({'error': 'Player progress not found'}), 404
         
-        # Update fields if provided
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Update user display name if provided
+        if 'username' in data:
+            user.name = data['username']
+        
+        # Update game progress fields if provided
         if 'bullets' in data:
-            progress.bullets = max(0, data['bullets'])
+            progress.bullets = max(0, int(data['bullets']))
         
         if 'lives' in data:
-            progress.lives = max(0, data['lives'])
+            progress.lives = max(0, int(data['lives']))
         
         if 'position' in data:
-            progress.move_to_position(data['position'])
+            progress.move_to_position(int(data['position']))
+        
+        if 'character' in data:
+            # Store character preference in user's grade_data or create if doesn't exist
+            if not user.grade_data:
+                user.grade_data = {}
+            user.grade_data['character'] = data['character']
         
         db.session.commit()
         
         return jsonify({
-            'message': 'Player stats modified successfully',
+            'message': 'Player data modified successfully',
+            'user': {
+                'id': user.id,
+                'username': user.name,
+                'uid': user.uid
+            },
             'progress': progress.to_dict()
         }), 200
     

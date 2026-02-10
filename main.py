@@ -28,7 +28,7 @@ from __init__ import app, db, login_manager, socketio
 
 # Import boss battle socket handlers
 from socketio_handlers.boss_battle import init_boss_battle_socket
-from socketio_handlers.koz_events import init_koz_socket
+from socketio_handlers.slitherrush_events import init_slitherrush_socket
 
 # API endpoints
 from api.user import user_api 
@@ -212,7 +212,7 @@ with app.app_context():
 # ============================================================================
 # Initialize boss battle and PVP socket handlers
 init_boss_battle_socket(socketio)
-init_koz_socket(socketio)
+init_slitherrush_socket(socketio)
 
 # ============================================================================
 # FLASK-LOGIN CONFIGURATION

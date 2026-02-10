@@ -194,3 +194,58 @@ class BossBattleStats(db.Model):
             self.deaths += 1
         if player_data.get('damage_dealt', 0) > self.best_damage:
             self.best_damage = player_data.get('damage_dealt', 0)
+
+
+
+class SlitherRushStats(db.Model):
+    """Persisted per-user SLITHERRUSH profile statistics."""
+    __tablename__ = 'slitherrush_stats'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    username = Column(String(255), nullable=False)
+
+    matches_played = Column(Integer, default=0)
+    matches_won = Column(Integer, default=0)
+    total_score = Column(Integer, default=0)
+    total_kills = Column(Integer, default=0)
+    total_orbs = Column(Integer, default=0)
+    total_survival_seconds = Column(Integer, default=0)
+    best_length = Column(Integer, default=0)
+    best_score = Column(Integer, default=0)
+    last_played_at = Column(Float, nullable=True)
+
+    user = relationship("User", backref="slitherrush_stats")
+
+    def __init__(self, user_id, username):
+        self.user_id = user_id
+        self.username = username
+
+    def to_dict(self):
+        win_rate = (self.matches_won / self.matches_played * 100.0) if self.matches_played else 0.0
+        avg_score = (self.total_score / self.matches_played) if self.matches_played else 0.0
+        avg_survival = (self.total_survival_seconds / self.matches_played) if self.matches_played else 0.0
+        return {
+            'user_id': self.user_id,
+            'username': self.username,
+            'matches_played': int(self.matches_played or 0),
+            'matches_won': int(self.matches_won or 0),
+            'win_rate': round(win_rate, 1),
+            'total_score': int(self.total_score or 0),
+            'average_score': round(avg_score, 1),
+            'total_kills': int(self.total_kills or 0),
+            'total_orbs': int(self.total_orbs or 0),
+            'total_survival_seconds': int(self.total_survival_seconds or 0),
+            'average_survival_seconds': round(avg_survival, 1),
+            'best_length': int(self.best_length or 0),
+            'best_score': int(self.best_score or 0),
+        }
+
+    @staticmethod
+    def get_global_leaderboard(limit=50):
+        rows = SlitherRushStats.query.order_by(
+            SlitherRushStats.matches_won.desc(),
+            SlitherRushStats.total_score.desc(),
+            SlitherRushStats.best_length.desc()
+        ).limit(limit).all()
+        return [row.to_dict() for row in rows]

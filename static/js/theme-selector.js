@@ -308,14 +308,14 @@
                 { q: 'Can I leave without breaking progress?', a: 'Yes. Leave through in-mode controls so session cleanup completes correctly.' }
             ]
         },
-        'king-of-zone': {
-            title: 'King of the Zone FAQ',
-            intro: 'Zone control strategy and scoring help.',
+        'slitherrush': {
+            title: 'SLITHERRUSH FAQ',
+            intro: 'Fast multiplayer slither combat tips.',
             faqs: [
-                { q: 'How do I earn points in KOZ?', a: 'Stay in the active capture zone while contest pressure is low to accumulate score.' },
-                { q: 'Why did zone progress pause?', a: 'Zone capture can stall when contested by opponents or during zone relocation windows.' },
-                { q: 'What is the best strategy?', a: 'Rotate early to the next zone and hold high-value positions with short exposure.' },
-                { q: 'Does this mode affect bullets?', a: 'Mode outcomes can influence reward flow depending on your configured progression rules.' }
+                { q: 'How do I score points?', a: 'Collect energy orbs and survive longer than other slithers.' },
+                { q: 'What causes elimination?', a: 'Crashing into walls, another body, or losing a head-to-head clash.' },
+                { q: 'What happens after I die?', a: 'You immediately become a spectator and auto-follow a living slither.' },
+                { q: 'How do I switch spectator targets?', a: 'Use Q/E while spectating to cycle through alive players.' }
             ]
         },
         'platformer-arcade': {

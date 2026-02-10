@@ -97,6 +97,8 @@ def init_koz_socket(socketio) -> None:
             role = _koz_manager.join_player(sid, payload)
             now = time.time()
             _koz_manager.evaluate_state_machine(now)
+            lobby_snapshot = _koz_manager.serialize_lobby(now)
+            match_snapshot = _koz_manager.serialize_match_state(now)
 
             joined_payload = {
                 'sid': sid,
@@ -106,10 +108,12 @@ def init_koz_socket(socketio) -> None:
                 'tickRate': int(round(1.0 / _koz_manager.TICK_INTERVAL)),
                 'snapshotRate': int(round(1.0 / _koz_manager.SNAPSHOT_INTERVAL)),
                 'minPlayers': _koz_manager.MIN_PLAYERS_TO_START,
+                'activePlayers': int(lobby_snapshot.get('activePlayers', 0)),
+                'lobby': lobby_snapshot,
             }
             socketio.emit('koz:joined', joined_payload, to=sid)
-            socketio.emit('koz:lobby_update', _koz_manager.serialize_lobby(now), room=_koz_manager.ROOM_NAME)
-            socketio.emit('koz:match_state', _koz_manager.serialize_match_state(now), room=_koz_manager.ROOM_NAME)
+            socketio.emit('koz:lobby_update', lobby_snapshot, room=_koz_manager.ROOM_NAME)
+            socketio.emit('koz:match_state', match_snapshot, room=_koz_manager.ROOM_NAME)
             socketio.emit('koz:state', _koz_manager.serialize_snapshot(now), to=sid)
 
         _ensure_loop_started()

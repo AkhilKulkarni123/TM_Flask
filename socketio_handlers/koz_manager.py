@@ -273,11 +273,24 @@ class KozManager:
         now = time.time()
         payload = payload or {}
 
-        if sid in self.players:
-            self._refresh_player_profile(self.players[sid], payload)
-            return 'spectator' if self.players[sid].get('spectator') else 'player'
-
         active_count = self._active_player_count()
+        if active_count == 0 and self.state in ('ACTIVE', 'RESULTS'):
+            self.reset_to_lobby(now)
+            active_count = self._active_player_count()
+
+        if sid in self.players:
+            player = self.players[sid]
+            self._refresh_player_profile(player, payload)
+
+            if player.get('spectator') and self.state in ('LOBBY', 'COUNTDOWN') and active_count < self.MAX_ACTIVE_PLAYERS:
+                player['spectator'] = False
+                player['alive'] = False
+                sx, sy = self._next_spawn(active_count)
+                player['x'] = sx
+                player['y'] = sy
+
+            return 'spectator' if player.get('spectator') else 'player'
+
         spectator = self.state in ('ACTIVE', 'RESULTS') or active_count >= self.MAX_ACTIVE_PLAYERS
         player = self._build_player(sid, payload, spectator, now)
 
@@ -483,6 +496,10 @@ class KozManager:
     def evaluate_state_machine(self, now: float) -> None:
         active_count = self._active_player_count()
 
+        if active_count == 0 and self.state in ('ACTIVE', 'RESULTS'):
+            self.reset_to_lobby(now)
+            return
+
         if self.state == 'LOBBY':
             if active_count >= self.MIN_PLAYERS_TO_START:
                 self.state = 'COUNTDOWN'
@@ -582,7 +599,9 @@ class KozManager:
             'state': self.state,
             'room': self.ROOM_NAME,
             'minPlayers': self.MIN_PLAYERS_TO_START,
+            'min_players': self.MIN_PLAYERS_TO_START,
             'activePlayers': self._active_player_count(),
+            'active_players': self._active_player_count(),
             'spectators': len([p for p in self.players.values() if p.get('spectator')]),
             'countdown': countdown,
             'players': players,
@@ -609,7 +628,9 @@ class KozManager:
             'nextShrinkIn': max(0, next_shrink_in),
             'zoneRadius': float(self.zone.get('radius', 0.0)),
             'minPlayers': self.MIN_PLAYERS_TO_START,
+            'min_players': self.MIN_PLAYERS_TO_START,
             'activePlayers': self._active_player_count(),
+            'active_players': self._active_player_count(),
         }
 
     def serialize_snapshot(self, now: Optional[float] = None) -> Dict:
@@ -668,7 +689,9 @@ class KozManager:
                 'nextShrinkIn': max(0, next_shrink_in),
                 'scoreTarget': self.SCORE_TARGET,
                 'minPlayers': self.MIN_PLAYERS_TO_START,
+                'min_players': self.MIN_PLAYERS_TO_START,
                 'activePlayers': self._active_player_count(),
+                'active_players': self._active_player_count(),
             },
             'zone': {
                 'x': float(self.zone.get('x', self.MAP_WIDTH / 2.0)),

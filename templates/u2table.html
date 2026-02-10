@@ -255,6 +255,15 @@
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
+/*
+ * Admin user table client script.
+ * Snakes-specific responsibility:
+ * - Loads each user's Snakes game profile from `/api/snakes_game/:userId`.
+ * - Displays/edit saves for bullets + selected character in the admin UI.
+ * Fit in overall Snakes ecosystem:
+ * - This is an admin/support tool, not the gameplay client.
+ * - It helps instructors/admins inspect and adjust learner progress server-side.
+ */
 $(document).ready(function () {
     const table = $("#userTable").DataTable({
         pageLength: -1,
@@ -264,7 +273,7 @@ $(document).ready(function () {
     // Store game data for each user
     const gameDataCache = {};
 
-    // Fetch game data for all users
+    // Fetch Snakes game snapshots for every visible user row and cache locally for edit reset.
     async function fetchAllGameData() {
         const users = $("[id^='game-data-']");
         
@@ -279,11 +288,11 @@ $(document).ready(function () {
                     const data = await response.json();
                     gameDataCache[userId] = data;
                     
-                    // Update display
+                    // Update read-only row summary so admins can scan values quickly.
                     $(`#game-data-${userId} .bullets-count`).text(`${data.total_bullets || 0} bullets`);
                     $(`#game-data-${userId} .character-name`).text(data.selected_character || 'default');
                     
-                    // Update input fields
+                    // Pre-fill edit controls with current backend values.
                     $(`#bullets-${userId}`).val(data.total_bullets || 0);
                     $(`#character-${userId}`).val(data.selected_character || 'default');
                 } else {
@@ -296,7 +305,7 @@ $(document).ready(function () {
                 $(`#game-data-${userId} .character-name`).text('Error');
             }
             
-            // Small delay to avoid overwhelming the server
+            // Lightweight throttle avoids burst-loading many API calls at once.
             await new Promise(resolve => setTimeout(resolve, 100));
         }
     }
@@ -335,7 +344,7 @@ $(document).ready(function () {
         }
     }
 
-    // Process all users
+    // Boot pipeline: load Snakes data first, then contribution metrics, then paginate normally.
     async function processUsers() {
         // Fetch game data first
         await fetchAllGameData();
@@ -433,14 +442,14 @@ $(document).ready(function () {
         }
     });
 
-    // Edit game data button
+    // Opens inline controls for bullets/character edits.
     $(document).on('click', '.edit-game-btn', function() {
         const userId = $(this).data('id');
         $(`#edit-controls-${userId}`).addClass('active');
         $(this).prop('disabled', true);
     });
 
-    // Cancel edit button
+    // Cancel returns controls to cached backend state (discard unsaved local edits).
     $(document).on('click', '.cancel-edit-btn', function() {
         const userId = $(this).data('id');
         $(`#edit-controls-${userId}`).removeClass('active');
@@ -453,7 +462,7 @@ $(document).ready(function () {
         }
     });
 
-    // Save game data button, talk to mort starting here
+    // Persists admin overrides for Snakes progress fields.
     $(document).on('click', '.save-game-btn', async function() {
         const userId = $(this).data('id');
         const bullets = parseInt($(`#bullets-${userId}`).val()) || 0;
@@ -472,10 +481,10 @@ $(document).ready(function () {
             if (response.ok) {
                 const data = await response.json();
                 
-                // Update cache
+                // Keep cache aligned with confirmed server response.
                 gameDataCache[userId] = data;
                 
-                // Update display
+                // Reflect saved values immediately in summary labels.
                 $(`#game-data-${userId} .bullets-count`).text(`${bullets} bullets`);
                 $(`#game-data-${userId} .character-name`).text(character);
                 

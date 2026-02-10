@@ -86,7 +86,7 @@ def join_boss_battle():
 
         if not room:
             # All rooms full or none exist - create new room
-            room = BossRoom(max_boss_health=1000)
+            room = BossRoom(max_boss_health=2000)
             db.session.add(room)
             db.session.flush()
         

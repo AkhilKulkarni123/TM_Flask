@@ -5,6 +5,7 @@ from flask_cors import CORS
 
 # Import boss battle socket handlers
 from boss_battle import init_boss_battle_socket
+from koz_events import init_koz_socket
 
 app = Flask(__name__)
 
@@ -45,6 +46,7 @@ def index():
 
 # Initialize boss battle socket handlers
 init_boss_battle_socket(socketio)
+init_koz_socket(socketio)
 
 players = []  # Keep a list of players and scores
 

@@ -810,6 +810,13 @@ def init_boss_battle_socket(socketio):
         if sid in koz_sid_mapping:
             cleanup_koz_player(sid)
 
+        # Clean up KOZ 2.0 authoritative arena
+        try:
+            from socketio_handlers.koz_events import cleanup_disconnected_player
+            cleanup_disconnected_player(sid)
+        except Exception:
+            pass
+
     # ==================== POWERUP SYSTEM ====================
     import random
     import time

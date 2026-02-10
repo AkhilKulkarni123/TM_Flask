@@ -2,6 +2,9 @@ from flask_socketio import SocketIO, emit, join_room, leave_room, rooms
 from flask import request
 from flask_login import current_user
 import json
+import math
+import random
+import threading
 
 # Boss battle state - keyed by room_id
 boss_battles = {}  # { room_id: { boss_health, max_health, players: { sid: player_data } } }
@@ -36,8 +39,80 @@ koz_room_counter = 1
 PVP_PLAYER_RADIUS = 28
 # KOZ uses simple 12px circles client-side; 16px radius gives a forgiving buffer.
 KOZ_PLAYER_RADIUS = 16
+# Boss battle uses 70px boss + 35px player size on client canvas.
+BOSS_PLAYER_RADIUS = 35
+BOSS_BOSS_RADIUS = 70
+BOSS_DEFAULT_WIDTH = 1100
+BOSS_DEFAULT_HEIGHT = 600
+BOSS_TOP_MARGIN = 200
+BOSS_SPAWN_ATTEMPTS = 80
+BOSS_SPAWN_PADDING = 24
+BOSS_SPAWN_GRID_STEP = 40
+
+# Protects spawn allocation for concurrent joins
+boss_spawn_lock = threading.Lock()
 
 def init_boss_battle_socket(socketio):
+    def normalize_boss_bounds(bounds):
+        width = bounds.get('width', BOSS_DEFAULT_WIDTH) if isinstance(bounds, dict) else BOSS_DEFAULT_WIDTH
+        height = bounds.get('height', BOSS_DEFAULT_HEIGHT) if isinstance(bounds, dict) else BOSS_DEFAULT_HEIGHT
+        top = bounds.get('top', BOSS_TOP_MARGIN) if isinstance(bounds, dict) else BOSS_TOP_MARGIN
+        try:
+            width = int(width)
+            height = int(height)
+            top = int(top)
+        except (TypeError, ValueError):
+            width = BOSS_DEFAULT_WIDTH
+            height = BOSS_DEFAULT_HEIGHT
+            top = BOSS_TOP_MARGIN
+        width = max(480, width)
+        height = max(360, height)
+        top = max(0, min(top, height - 120))
+        return {'width': width, 'height': height, 'top': top}
+
+    def ensure_boss_bounds(room_id, incoming_bounds=None):
+        if room_id not in boss_battles:
+            return normalize_boss_bounds(incoming_bounds or {})
+        if 'bounds' not in boss_battles[room_id]:
+            boss_battles[room_id]['bounds'] = normalize_boss_bounds(incoming_bounds or {})
+        return boss_battles[room_id]['bounds']
+
+    def is_spawn_clear(room_id, x, y, radius, bounds):
+        # Avoid overlapping existing players
+        for other in boss_battles.get(room_id, {}).get('players', {}).values():
+            ox = other.get('x', x)
+            oy = other.get('y', y)
+            if math.hypot(x - ox, y - oy) < (radius * 2 + 6):
+                return False
+        # Avoid the boss zone near the top of the map
+        boss_x = bounds['width'] / 2
+        boss_y = 110
+        if math.hypot(x - boss_x, y - boss_y) < (BOSS_BOSS_RADIUS + radius + 12):
+            return False
+        return True
+
+    def allocate_boss_spawn(room_id, radius, bounds):
+        min_x = radius + BOSS_SPAWN_PADDING
+        max_x = bounds['width'] - radius - BOSS_SPAWN_PADDING
+        min_y = max(bounds['top'] + radius, 260)
+        max_y = bounds['height'] - radius - BOSS_SPAWN_PADDING
+        if max_x <= min_x or max_y <= min_y:
+            return None
+        for _ in range(BOSS_SPAWN_ATTEMPTS):
+            x = random.uniform(min_x, max_x)
+            y = random.uniform(min_y, max_y)
+            if is_spawn_clear(room_id, x, y, radius, bounds):
+                return x, y
+        step = max(radius * 2, BOSS_SPAWN_GRID_STEP)
+        y = min_y
+        while y <= max_y:
+            x = min_x
+            while x <= max_x:
+                if is_spawn_clear(room_id, x, y, radius, bounds):
+                    return x, y
+                x += step
+            y += step
+        return None
 
     def get_room_players_list(room_id):
         """Get list of players in a room with their data"""
@@ -60,6 +135,7 @@ def init_boss_battle_socket(socketio):
         """Handle player joining a boss battle room"""
         room_id = data.get('room_id', 'default_room')
         player_data = data.get('player', {})
+        incoming_bounds = data.get('bounds')
         boss_health = data.get('boss_health', 1000)
         max_boss_health = data.get('max_boss_health', 1000)
 
@@ -79,6 +155,7 @@ def init_boss_battle_socket(socketio):
                 'max_health': max_boss_health,
                 'players': {}
             }
+        room_bounds = ensure_boss_bounds(room_id, incoming_bounds)
 
         # Check if room is full
         if len(boss_battles[room_id]['players']) >= MAX_PLAYERS_PER_ROOM:
@@ -89,17 +166,26 @@ def init_boss_battle_socket(socketio):
         join_room(room_id)
         sid_to_room[sid] = room_id
 
-        # Add player to battle
-        boss_battles[room_id]['players'][sid] = {
-            'username': username,
-            'user_id': user_id,
-            'character': character,
-            'bullets': bullets,
-            'lives': lives,
-            'x': x,
-            'y': y,
-            'status': 'alive'
-        }
+        # Add player to battle (server assigns safe spawn)
+        with boss_spawn_lock:
+            spawn = allocate_boss_spawn(room_id, BOSS_PLAYER_RADIUS, room_bounds)
+            if spawn:
+                x, y = spawn
+            else:
+                # Fallback to clamped requested position if needed
+                x = max(BOSS_PLAYER_RADIUS, min(x, room_bounds['width'] - BOSS_PLAYER_RADIUS))
+                y = max(room_bounds['top'] + BOSS_PLAYER_RADIUS, min(y, room_bounds['height'] - BOSS_PLAYER_RADIUS))
+
+            boss_battles[room_id]['players'][sid] = {
+                'username': username,
+                'user_id': user_id,
+                'character': character,
+                'bullets': bullets,
+                'lives': lives,
+                'x': x,
+                'y': y,
+                'status': 'alive'
+            }
 
         player_count = len(boss_battles[room_id]['players'])
         players_list = get_room_players_list(room_id)
@@ -111,7 +197,14 @@ def init_boss_battle_socket(socketio):
             'maxBossHealth': boss_battles[room_id]['max_health'],
             'playerCount': player_count,
             'players': players_list,
-            'powerups': room_powerups
+            'powerups': room_powerups,
+            'self': {
+                'x': x,
+                'y': y,
+                'bullets': bullets,
+                'lives': lives
+            },
+            'bounds': room_bounds
         })
 
         # Notify all OTHER players in the room that someone joined
@@ -139,6 +232,8 @@ def init_boss_battle_socket(socketio):
         room_id = data.get('room_id')
         x = data.get('x')
         y = data.get('y')
+        boss_x = data.get('boss_x')
+        boss_y = data.get('boss_y')
         sid = request.sid
 
         if not room_id or room_id not in boss_battles:
@@ -147,16 +242,54 @@ def init_boss_battle_socket(socketio):
         if sid not in boss_battles[room_id]['players']:
             return
 
+        if x is None or y is None:
+            return
+
+        # Server-authoritative bounds + collision resolution
+        room_bounds = boss_battles[room_id].get('bounds') or normalize_boss_bounds({})
+        desired_x = max(BOSS_PLAYER_RADIUS, min(x, room_bounds['width'] - BOSS_PLAYER_RADIUS))
+        desired_y = max(room_bounds['top'] + BOSS_PLAYER_RADIUS, min(y, room_bounds['height'] - BOSS_PLAYER_RADIUS))
+
+        # Resolve boss collision if boss coords provided
+        if boss_x is not None and boss_y is not None:
+            try:
+                boss_x = float(boss_x)
+                boss_y = float(boss_y)
+                desired_x, desired_y, _ = resolve_player_collision(
+                    desired_x, desired_y, boss_x, boss_y, BOSS_BOSS_RADIUS + BOSS_PLAYER_RADIUS
+                )
+            except (TypeError, ValueError):
+                pass
+
+        # Resolve player ↔ player collisions
+        min_dist = BOSS_PLAYER_RADIUS * 2
+        for other_sid, other in boss_battles[room_id]['players'].items():
+            if other_sid == sid:
+                continue
+            desired_x, desired_y, _ = resolve_player_collision(
+                desired_x, desired_y, other.get('x', desired_x), other.get('y', desired_y), min_dist
+            )
+
+        # Final clamp to bounds after collision resolution
+        desired_x = max(BOSS_PLAYER_RADIUS, min(desired_x, room_bounds['width'] - BOSS_PLAYER_RADIUS))
+        desired_y = max(room_bounds['top'] + BOSS_PLAYER_RADIUS, min(desired_y, room_bounds['height'] - BOSS_PLAYER_RADIUS))
+
         # Update stored position
-        boss_battles[room_id]['players'][sid]['x'] = x
-        boss_battles[room_id]['players'][sid]['y'] = y
+        boss_battles[room_id]['players'][sid]['x'] = desired_x
+        boss_battles[room_id]['players'][sid]['y'] = desired_y
 
         # Broadcast position to all OTHER players in the room
         emit('boss_player_position', {
             'sid': sid,
-            'x': x,
-            'y': y
+            'x': desired_x,
+            'y': desired_y
         }, room=room_id, include_self=False)
+
+        # Authoritative position for the mover
+        emit('boss_self_position', {
+            'x': desired_x,
+            'y': desired_y
+        }, to=sid)
 
     # ==================== PLAYER STATS UPDATE ====================
     @socketio.on('boss_player_stats')
@@ -826,6 +959,8 @@ def init_boss_battle_socket(socketio):
             'boss_health': 1000,
             'max_boss_health': 1000
         }
+        if data.get('bounds'):
+            new_data['bounds'] = data.get('bounds')
         handle_join_room(new_data)
 
     @socketio.on('attack_boss')

@@ -1,237 +1,414 @@
 {% extends "layouts/base.html" %}
 {% set project = "Home" %}
 
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/snakes-theme.css') }}">
+{% endblock %}
+
 {% block style %}
 <style>
-    .game-hero {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 60px 20px;
-        border-radius: 15px;
-        margin-bottom: 40px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        text-align: center;
+    .tm-home {
+        position: relative;
+        padding: 56px 24px 90px;
+        color: var(--heading, #f4f7ff);
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+        overflow: hidden;
     }
-    
-    .game-hero h1 {
-        font-size: 3.5rem;
-        font-weight: bold;
-        color: #fff;
-        text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
-        margin-bottom: 20px;
+
+    .tm-home * {
+        box-sizing: border-box;
     }
-    
-    .game-hero p {
-        font-size: 1.3rem;
-        color: #f0f0f0;
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
-    .game-card {
-        background: linear-gradient(145deg, #ffffff, #f0f0f0);
-        border-radius: 20px;
-        padding: 30px;
-        margin-bottom: 30px;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        height: 100%;
-        border: 3px solid transparent;
-    }
-    
-    .game-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.25);
-    }
-    
-    .game-card.learn {
-        border-color: #4CAF50;
-    }
-    
-    .game-card.play {
-        border-color: #2196F3;
-    }
-    
-    .game-card.battle {
-        border-color: #FF5722;
-    }
-    
-    .icon-wrapper {
-        width: 100px;
-        height: 100px;
-        margin: 0 auto 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+    .tm-home::before,
+    .tm-home::after {
+        content: "";
+        position: absolute;
+        width: 420px;
+        height: 420px;
         border-radius: 50%;
+        filter: blur(0);
+        opacity: 0.28;
+        z-index: 0;
+    }
+
+    .tm-home::before {
+        top: -140px;
+        right: -120px;
+        background: radial-gradient(circle, rgba(var(--accent-rgb, 102, 126, 234), 0.55), transparent 70%);
+    }
+
+    .tm-home::after {
+        bottom: -180px;
+        left: -100px;
+        background: radial-gradient(circle, rgba(var(--accent-2-rgb, 118, 75, 162), 0.55), transparent 70%);
+    }
+
+    .tm-shell {
+        position: relative;
+        z-index: 1;
+        max-width: 1200px;
+        margin: 0 auto;
         display: flex;
+        flex-direction: column;
+        gap: 48px;
+    }
+
+    .tm-hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 32px;
         align-items: center;
-        justify-content: center;
-        font-size: 3rem;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
-    
-    .game-card.learn .icon-wrapper {
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    }
-    
-    .game-card.play .icon-wrapper {
-        background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-    }
-    
-    .game-card.battle .icon-wrapper {
-        background: linear-gradient(135deg, #FF5722 0%, #E64A19 100%);
-    }
-    
-    .game-card h3 {
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 20px;
-    }
-    
-    .game-card ul {
-        text-align: left;
-        font-size: 1.1rem;
-        color: #555;
-        line-height: 1.8;
-    }
-    
-    .game-card ul li {
+
+    .tm-hero-eyebrow {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
         margin-bottom: 12px;
     }
-    
-    .start-btn {
-        background: linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%);
-        color: white;
-        padding: 15px 40px;
-        font-size: 1.3rem;
-        font-weight: bold;
-        border: none;
-        border-radius: 50px;
-        box-shadow: 0 5px 15px rgba(255,107,107,0.4);
-        transition: all 0.3s ease;
-        margin-top: 30px;
+
+    .tm-hero h1 {
+        font-size: clamp(2.4rem, 3vw, 3.6rem);
+        line-height: 1.1;
+        margin-bottom: 18px;
     }
-    
-    .start-btn:hover {
-        background: linear-gradient(135deg, #FF5252 0%, #FF3D3D 100%);
-        box-shadow: 0 8px 25px rgba(255,107,107,0.6);
-        transform: scale(1.05);
+
+    .tm-hero p {
+        font-size: 1.1rem;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+        max-width: 520px;
+        margin-bottom: 24px;
     }
-    
-    .feature-badge {
-        display: inline-block;
-        background: #667eea;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 20px;
+
+    .tm-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+
+    .tm-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 12px 26px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        text-decoration: none;
+        border: 2px solid transparent;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+
+    .tm-btn-primary {
+        background: var(--button-bg, linear-gradient(135deg, #334a7a, #2c3d63));
+        color: var(--button-text, #f4f8ff);
+        box-shadow: 0 16px 28px rgba(var(--accent-rgb, 102, 126, 234), 0.35);
+    }
+
+    .tm-btn-primary:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.05);
+        box-shadow: 0 20px 32px rgba(var(--accent-rgb, 102, 126, 234), 0.45);
+    }
+
+    .tm-btn-ghost {
+        border-color: rgba(255, 255, 255, 0.18);
+        color: var(--heading, #f4f7ff);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tm-btn-ghost:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.12);
+    }
+
+    .tm-highlight-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .tm-highlight {
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        background: rgba(var(--accent-rgb, 102, 126, 234), 0.18);
+        color: var(--heading, #f4f7ff);
+        border: 1px solid rgba(var(--accent-rgb, 102, 126, 234), 0.3);
+    }
+
+    .tm-hero-panel {
+        background: var(--panel-bg, rgba(10, 14, 22, 0.78));
+        border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+        border-radius: 22px;
+        padding: 24px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
+    }
+
+    .tm-hero-panel h3 {
+        font-size: 1.2rem;
+        margin-bottom: 12px;
+    }
+
+    .tm-hero-panel ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 14px;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+    }
+
+    .tm-hero-panel li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .tm-hero-panel span {
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
         font-size: 0.9rem;
-        margin-right: 10px;
-        margin-bottom: 10px;
+        color: var(--heading, #f4f7ff);
+        background: rgba(255, 255, 255, 0.08);
+        padding: 4px 8px;
+        border-radius: 8px;
+    }
+
+    .tm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 24px;
+    }
+
+    .tm-card {
+        position: relative;
+        background: linear-gradient(135deg, rgba(18, 24, 40, 0.88), rgba(10, 14, 22, 0.88));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 24px;
+        min-height: 240px;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tm-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55);
+    }
+
+    .tm-card .tm-card-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        font-size: 1.4rem;
+        background: rgba(var(--accent-rgb, 102, 126, 234), 0.25);
+        color: var(--heading, #f4f7ff);
+    }
+
+    .tm-card h4 {
+        font-size: 1.3rem;
+        margin: 0;
+    }
+
+    .tm-card p {
+        margin: 0;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+    }
+
+    .tm-card ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+    }
+
+    .tm-card ul li::before {
+        content: "-";
+        margin-right: 8px;
+        color: var(--accent, #667eea);
+    }
+
+    .tm-steps {
+        background: var(--panel-bg, rgba(10, 14, 22, 0.78));
+        border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.12));
+        border-radius: 24px;
+        padding: 28px;
+        display: grid;
+        gap: 16px;
+    }
+
+    .tm-steps h3 {
+        margin: 0;
+    }
+
+    .tm-step-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .tm-step {
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 18px;
+    }
+
+    .tm-step h5 {
+        margin-bottom: 8px;
+        font-size: 1rem;
+        color: var(--heading, #f4f7ff);
+    }
+
+    .tm-step p {
+        margin: 0;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+        font-size: 0.95rem;
+    }
+
+    .tm-cta {
+        background: linear-gradient(135deg, rgba(var(--accent-rgb, 102, 126, 234), 0.2), rgba(var(--accent-2-rgb, 118, 75, 162), 0.2));
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 24px;
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        align-items: flex-start;
+    }
+
+    .tm-cta h3 {
+        margin: 0;
+    }
+
+    .tm-cta p {
+        margin: 0;
+        color: var(--muted-text, rgba(230, 236, 255, 0.82));
+    }
+
+    @media (max-width: 768px) {
+        .tm-home {
+            padding: 40px 18px 70px;
+        }
+
+        .tm-hero-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .tm-btn {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
 
 {% block body %}
-<div class="px-5 py-5 mx-auto">
-    <!-- Hero Section -->
-    <div class="game-hero">
-        <h1>🐍 Snakes & Ladders Coding Adventure 🎮</h1>
-        <p>Climb the ladders of knowledge, avoid the snakes, and conquer the ultimate boss battle! Learn coding through an epic multiplayer board game journey.</p>
-        <a href="https://akhilkulkarni123.github.io/TM_FrontEnd/snakes-game" class="btn start-btn">🚀 Start Your Adventure</a>
-    </div>
-
-    <!-- Three Main Sections -->
-    <div class="row">
-        <!-- Section 1: Learn -->
-        <div class="col-md-4">
-            <div class="game-card learn">
-                <div class="icon-wrapper">
-                    <span>📚</span>
+<div class="tm-home">
+    <div class="tm-shell snakes-theme">
+        <section class="tm-hero">
+            <div>
+                <div class="tm-hero-eyebrow">TM Flask Home</div>
+                <h1>Snakes and Ladders Coding Adventure</h1>
+                <p>Level up your coding skills with interactive lessons, live challenges, and multiplayer boss battles. Pick a path, roll forward, and unlock the next mission.</p>
+                <div class="tm-hero-actions">
+                    <a href="https://akhilkulkarni123.github.io/TM_FrontEnd/snakes-game" class="tm-btn tm-btn-primary">Start the Adventure</a>
+                    <a href="/login" class="tm-btn tm-btn-ghost">Login to Play</a>
                 </div>
-                <h3>📖 Learn the Fundamentals</h3>
-                <p class="text-center mb-3"><strong>Master coding basics through interactive lessons!</strong></p>
+                <div class="tm-highlight-list">
+                    <span class="tm-highlight">Multiplayer rooms</span>
+                    <span class="tm-highlight">Progress tracking</span>
+                    <span class="tm-highlight">Practice-first quests</span>
+                </div>
+            </div>
+            <div class="tm-hero-panel">
+                <h3>Mission Brief</h3>
                 <ul>
-                    <li><strong>Python Basics:</strong> Variables, loops, and conditionals explained through fun challenges</li>
-                    <li><strong>Data Structures:</strong> Learn lists, dictionaries, and arrays with visual examples</li>
-                    <li><strong>Functions & Logic:</strong> Build reusable code blocks and solve puzzles</li>
-                    <li><strong>Debugging Skills:</strong> Identify and fix common coding errors</li>
-                    <li><strong>Interactive Quizzes:</strong> Test your knowledge after each lesson</li>
+                    <li><span>01</span> Complete short lessons to unlock board squares.</li>
+                    <li><span>02</span> Roll the dice and solve coding challenges.</li>
+                    <li><span>03</span> Form squads to defeat the boss battle.</li>
                 </ul>
-                <div class="text-center mt-3">
-                    <span class="feature-badge">🎯 Beginner Friendly</span>
-                    <span class="feature-badge">⚡ Quick Lessons</span>
-                </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Section 2: Play -->
-        <div class="col-md-4">
-            <div class="game-card play">
-                <div class="icon-wrapper">
-                    <span>🎲</span>
-                </div>
-                <h3>🎮 Play the Game Board</h3>
-                <p class="text-center mb-3"><strong>Apply your skills in the classic Snakes & Ladders experience!</strong></p>
-                <ul>
-                    <li><strong>Roll & Move:</strong> Navigate through a coding-themed game board</li>
-                    <li><strong>Challenge Squares:</strong> Answer coding questions to advance</li>
-                    <li><strong>Ladder Boosts:</strong> Correct answers help you climb up quickly</li>
-                    <li><strong>Snake Setbacks:</strong> Wrong answers send you sliding down</li>
-                    <li><strong>Power-ups:</strong> Collect bonus items to help your journey</li>
-                    <li><strong>Real-time Progress:</strong> Track your score and advancement</li>
-                </ul>
-                <div class="text-center mt-3">
-                    <span class="feature-badge">🏆 Compete</span>
-                    <span class="feature-badge">📊 Track Progress</span>
-                </div>
+        <section>
+            <div class="tm-grid">
+                <article class="tm-card">
+                    <div class="tm-card-icon">L</div>
+                    <h4>Learn the Fundamentals</h4>
+                    <p>Start with interactive lessons that teach syntax, logic, and debugging.</p>
+                    <ul>
+                        <li>Python basics and loops</li>
+                        <li>Data structures and lists</li>
+                        <li>Live knowledge checks</li>
+                    </ul>
+                </article>
+                <article class="tm-card">
+                    <div class="tm-card-icon">P</div>
+                    <h4>Play the Board</h4>
+                    <p>Advance across the board, answer questions, and climb the ladders.</p>
+                    <ul>
+                        <li>Timed challenge squares</li>
+                        <li>Progress checkpoints</li>
+                        <li>Power-ups and boosts</li>
+                    </ul>
+                </article>
+                <article class="tm-card">
+                    <div class="tm-card-icon">B</div>
+                    <h4>Boss Battle</h4>
+                    <p>Team up to solve advanced puzzles and take down the final boss.</p>
+                    <ul>
+                        <li>Live multiplayer rooms</li>
+                        <li>Co-op debugging missions</li>
+                        <li>Achievement rewards</li>
+                    </ul>
+                </article>
             </div>
-        </div>
+        </section>
 
-        <!-- Section 3: Boss Battle -->
-        <div class="col-md-4">
-            <div class="game-card battle">
-                <div class="icon-wrapper">
-                    <span>⚔️</span>
+        <section class="tm-steps">
+            <h3>How the Journey Works</h3>
+            <div class="tm-step-grid">
+                <div class="tm-step">
+                    <h5>1. Learn</h5>
+                    <p>Finish short lessons to unlock your next roll.</p>
                 </div>
-                <h3>👾 Conquer the Boss Battle</h3>
-                <p class="text-center mb-3"><strong>Team up with friends to defeat the ultimate boss!</strong></p>
-                <ul>
-                    <li><strong>Multiplayer Rooms:</strong> Join forces with other players in real-time</li>
-                    <li><strong>Epic Boss Fights:</strong> Face challenging coding problems together</li>
-                    <li><strong>Collaborative Solving:</strong> Work as a team to debug and solve</li>
-                    <li><strong>Timed Challenges:</strong> Beat the clock to defeat the boss</li>
-                    <li><strong>Special Rewards:</strong> Unlock achievements and badges</li>
-                    <li><strong>Difficulty Levels:</strong> From beginner bosses to expert challenges</li>
-                </ul>
-                <div class="text-center mt-3">
-                    <span class="feature-badge">👥 Multiplayer</span>
-                    <span class="feature-badge">🎖️ Achievements</span>
+                <div class="tm-step">
+                    <h5>2. Roll</h5>
+                    <p>Move across the board and trigger coding challenges.</p>
+                </div>
+                <div class="tm-step">
+                    <h5>3. Answer</h5>
+                    <p>Clear question checkpoints to climb ladders faster.</p>
+                </div>
+                <div class="tm-step">
+                    <h5>4. Win</h5>
+                    <p>Reach the final tile and enter the boss fight.</p>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <!-- How to Play Section -->
-    <div class="game-hero mt-5">
-        <h2 style="color: white; margin-bottom: 20px;">🎯 How to Play</h2>
-        <div class="row text-white">
-            <div class="col-md-3">
-                <h4>1️⃣ Learn</h4>
-                <p>Study coding concepts through interactive lessons</p>
-            </div>
-            <div class="col-md-3">
-                <h4>2️⃣ Roll</h4>
-                <p>Move across the board by rolling the dice</p>
-            </div>
-            <div class="col-md-3">
-                <h4>3️⃣ Answer</h4>
-                <p>Solve coding challenges on each square</p>
-            </div>
-            <div class="col-md-3">
-                <h4>4️⃣ Win</h4>
-                <p>Reach the end and battle the final boss!</p>
-            </div>
-        </div>
-        <a href="https://akhilkulkarni123.github.io/TM_FrontEnd/snakes-game" class="btn start-btn mt-4">🔐 Login to Start Playing</a>
+        <section class="tm-cta">
+            <h3>Ready for a new theme?</h3>
+            <p>Use the floating palette button to switch the look and feel at any time.</p>
+            <a href="https://akhilkulkarni123.github.io/TM_FrontEnd/snakes-game" class="tm-btn tm-btn-primary">Launch Game Hub</a>
+        </section>
     </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/theme-selector.js') }}"></script>
 {% endblock %}

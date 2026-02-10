@@ -1,0 +1,230 @@
+body.snakes-theme, .snakes-theme { --bg-1: #0f0c29; --bg-2: #1d2342; --bg-3: #24243e; --accent: #667eea; --accent-rgb: 102, 126, 234; --accent-2: #764ba2; --accent-2-rgb: 118, 75, 162; --card-border: #2ecc71; --card-border-rgb: 46, 204, 113; --muted-text: rgba(230, 236, 255, 0.82); --heading: #f8fbff; --button-bg: linear-gradient(135deg, #334a7a, #2c3d63); --button-bg-hover: linear-gradient(135deg, #3f5b93, #354a77); --button-text: #f4f8ff; --panel-bg: rgba(10, 14, 22, 0.78); --panel-border: rgba(255, 255, 255, 0.16); --panel-soft: rgba(255, 255, 255, 0.08); --focus-ring: rgba(118, 75, 162, 0.42); --mode-boss-border: #e94560; --mode-pvp-border: #4facfe; --mode-koz-border: #f1c40f; --mode-koz-glow: rgba(241, 196, 15, 0.28); }
+
+body.snakes-theme[data-theme='aurora-mint'], body[data-theme='aurora-mint'] .snakes-theme, .snakes-theme[data-theme='aurora-mint'] { --bg-1: #062b2f; --bg-2: #0f2f36; --bg-3: #102a2f; --accent: #3dd6b0; --accent-rgb: 61, 214, 176; --accent-2: #7fffd4; --accent-2-rgb: 127, 255, 212; --card-border: #43f0c2; --card-border-rgb: 67, 240, 194; --muted-text: rgba(225, 255, 246, 0.86); --heading: #ebfffa; --button-bg: linear-gradient(135deg, #1ea78f, #0f766e); --button-bg-hover: linear-gradient(135deg, #2ac1a6, #149486); --button-text: #eafffa; --panel-bg: rgba(6, 25, 24, 0.78); --panel-border: rgba(127, 255, 212, 0.22); --mode-boss-border: #4be8c7; --mode-pvp-border: #42d9f8; --mode-koz-border: #c7ff7b; --mode-koz-glow: rgba(199, 255, 123, 0.3); }
+
+body.snakes-theme[data-theme='emberforge'], body[data-theme='emberforge'] .snakes-theme, .snakes-theme[data-theme='emberforge'] { --bg-1: #2b0f07; --bg-2: #3b140b; --bg-3: #44130f; --accent: #ff7a3d; --accent-rgb: 255, 122, 61; --accent-2: #ffb347; --accent-2-rgb: 255, 179, 71; --card-border: #ff8f5a; --card-border-rgb: 255, 143, 90; --muted-text: rgba(255, 218, 204, 0.88); --heading: #ffe9df; --button-bg: linear-gradient(135deg, #ff6a3d, #c0392b); --button-bg-hover: linear-gradient(135deg, #ff7f52, #d04936); --button-text: #fff4ee; --panel-bg: rgba(33, 10, 7, 0.78); --panel-border: rgba(255, 179, 71, 0.24); --mode-boss-border: #ff7a3d; --mode-pvp-border: #ffb347; --mode-koz-border: #ffd166; --mode-koz-glow: rgba(255, 209, 102, 0.32); }
+
+body.snakes-theme[data-theme='midnight-violet'], body[data-theme='midnight-violet'] .snakes-theme, .snakes-theme[data-theme='midnight-violet'] { --bg-1: #0c0820; --bg-2: #181035; --bg-3: #22113d; --accent: #8b5cf6; --accent-rgb: 139, 92, 246; --accent-2: #c084fc; --accent-2-rgb: 192, 132, 252; --card-border: #a78bfa; --card-border-rgb: 167, 139, 250; --muted-text: rgba(224, 207, 255, 0.86); --heading: #f3edff; --button-bg: linear-gradient(135deg, #7c3aed, #4c1d95); --button-bg-hover: linear-gradient(135deg, #8f4eff, #5a24ac); --button-text: #f8f3ff; --panel-bg: rgba(18, 10, 35, 0.78); --panel-border: rgba(192, 132, 252, 0.24); --mode-boss-border: #b37bff; --mode-pvp-border: #8f9cff; --mode-koz-border: #d5b3ff; --mode-koz-glow: rgba(213, 179, 255, 0.34); }
+
+body.snakes-theme[data-theme='solar-flare'], body[data-theme='solar-flare'] .snakes-theme, .snakes-theme[data-theme='solar-flare'] { --bg-1: #2b1200; --bg-2: #3d1b00; --bg-3: #4f2400; --accent: #ffb703; --accent-rgb: 255, 183, 3; --accent-2: #fb8500; --accent-2-rgb: 251, 133, 0; --card-border: #ffd166; --card-border-rgb: 255, 209, 102; --muted-text: rgba(255, 234, 186, 0.88); --heading: #fff4dd; --button-bg: linear-gradient(135deg, #ff9f1c, #ff6b35); --button-bg-hover: linear-gradient(135deg, #ffb33d, #ff7c47); --button-text: #fff8ea; --panel-bg: rgba(38, 16, 4, 0.78); --panel-border: rgba(255, 183, 3, 0.24); --mode-boss-border: #ff8a00; --mode-pvp-border: #ffb703; --mode-koz-border: #ffe07a; --mode-koz-glow: rgba(255, 224, 122, 0.34); }
+
+body.snakes-theme[data-theme='oceanic-depths'], body[data-theme='oceanic-depths'] .snakes-theme, .snakes-theme[data-theme='oceanic-depths'] { --bg-1: #021b2d; --bg-2: #043041; --bg-3: #063b45; --accent: #00b4d8; --accent-rgb: 0, 180, 216; --accent-2: #48cae4; --accent-2-rgb: 72, 202, 228; --card-border: #90e0ef; --card-border-rgb: 144, 224, 239; --muted-text: rgba(204, 242, 255, 0.88); --heading: #e7fbff; --button-bg: linear-gradient(135deg, #0077b6, #0096c7); --button-bg-hover: linear-gradient(135deg, #178bcb, #12a9da); --button-text: #ecfcff; --panel-bg: rgba(4, 24, 35, 0.8); --panel-border: rgba(72, 202, 228, 0.24); --mode-boss-border: #33bfd9; --mode-pvp-border: #4fd4ff; --mode-koz-border: #9ee9ff; --mode-koz-glow: rgba(158, 233, 255, 0.3); }
+
+body.snakes-theme[data-theme='rose-nebula'], body[data-theme='rose-nebula'] .snakes-theme, .snakes-theme[data-theme='rose-nebula'] { --bg-1: #2a0c1f; --bg-2: #35122b; --bg-3: #3f1533; --accent: #ff5ca8; --accent-rgb: 255, 92, 168; --accent-2: #ff8fab; --accent-2-rgb: 255, 143, 171; --card-border: #ffa8c6; --card-border-rgb: 255, 168, 198; --muted-text: rgba(255, 218, 235, 0.88); --heading: #fff0f6; --button-bg: linear-gradient(135deg, #ff4d8d, #c9184a); --button-bg-hover: linear-gradient(135deg, #ff66a0, #db1f57); --button-text: #fff0f7; --panel-bg: rgba(36, 10, 28, 0.8); --panel-border: rgba(255, 143, 171, 0.24); --mode-boss-border: #ff6f9c; --mode-pvp-border: #ff9cc2; --mode-koz-border: #ffd1e2; --mode-koz-glow: rgba(255, 209, 226, 0.34); }
+
+body.snakes-theme[data-theme='cyber-lime'], body[data-theme='cyber-lime'] .snakes-theme, .snakes-theme[data-theme='cyber-lime'] { --bg-1: #081a05; --bg-2: #11280a; --bg-3: #16310e; --accent: #a3e635; --accent-rgb: 163, 230, 53; --accent-2: #bef264; --accent-2-rgb: 190, 242, 100; --card-border: #d9f99d; --card-border-rgb: 217, 249, 157; --muted-text: rgba(234, 255, 201, 0.9); --heading: #f5ffe9; --button-bg: linear-gradient(135deg, #84cc16, #4d7c0f); --button-bg-hover: linear-gradient(135deg, #98e620, #5a8f14); --button-text: #f7ffe8; --panel-bg: rgba(12, 23, 6, 0.8); --panel-border: rgba(190, 242, 100, 0.24); --mode-boss-border: #8cd93f; --mode-pvp-border: #bbff5a; --mode-koz-border: #e6ffaf; --mode-koz-glow: rgba(230, 255, 175, 0.34); }
+
+body.snakes-theme[data-theme='glacier-blue'], body[data-theme='glacier-blue'] .snakes-theme, .snakes-theme[data-theme='glacier-blue'] { --bg-1: #0a1f33; --bg-2: #10304b; --bg-3: #12395a; --accent: #60a5fa; --accent-rgb: 96, 165, 250; --accent-2: #93c5fd; --accent-2-rgb: 147, 197, 253; --card-border: #bfdbfe; --card-border-rgb: 191, 219, 254; --muted-text: rgba(222, 236, 255, 0.88); --heading: #f1f7ff; --button-bg: linear-gradient(135deg, #3b82f6, #1d4ed8); --button-bg-hover: linear-gradient(135deg, #5397ff, #2c5cef); --button-text: #eff6ff; --panel-bg: rgba(10, 25, 44, 0.8); --panel-border: rgba(147, 197, 253, 0.24); --mode-boss-border: #76b0ff; --mode-pvp-border: #9ad2ff; --mode-koz-border: #d0e8ff; --mode-koz-glow: rgba(208, 232, 255, 0.34); }
+
+body.snakes-theme[data-theme='sandstone-gold'], body[data-theme='sandstone-gold'] .snakes-theme, .snakes-theme[data-theme='sandstone-gold'] { --bg-1: #2a1e12; --bg-2: #3a2b1a; --bg-3: #4a3724; --accent: #d4a373; --accent-rgb: 212, 163, 115; --accent-2: #e9c46a; --accent-2-rgb: 233, 196, 106; --card-border: #f4d58d; --card-border-rgb: 244, 213, 141; --muted-text: rgba(250, 232, 202, 0.9); --heading: #fff6e5; --button-bg: linear-gradient(135deg, #c58940, #a97142); --button-bg-hover: linear-gradient(135deg, #d39a52, #b67f50); --button-text: #fff7e8; --panel-bg: rgba(33, 24, 16, 0.8); --panel-border: rgba(233, 196, 106, 0.24); --mode-boss-border: #d59a5f; --mode-pvp-border: #e9c46a; --mode-koz-border: #f6db9f; --mode-koz-glow: rgba(246, 219, 159, 0.36); }
+
+.character-select-active { overflow: hidden; }
+.character-select-active .game-landing-container { height: 100vh; overflow: hidden; }
+.character-select-active .pixel-background { display: none; }
+.character-select-active #character-selection { z-index: 20; position: fixed; inset: 0; width: 100vw; height: 100vh; box-shadow: none; }
+
+body.snakes-theme, .snakes-theme { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%); color: var(--heading); min-height: 100vh; position: relative; overflow-x: hidden; /* Lesson theming to follow the selector */ }
+body.snakes-theme::before, .snakes-theme::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 50%, rgba(var(--accent-rgb), 0.14) 0%, transparent 55%), radial-gradient(circle at 80% 80%, rgba(var(--accent-2-rgb), 0.12) 0%, transparent 55%); pointer-events: none; z-index: 0; }
+body.snakes-theme .container, body.snakes-theme #game-container, body.snakes-theme #login-container, body.snakes-theme #character-selection:not(.theme-layout-v2), .snakes-theme .container, .snakes-theme #game-container, .snakes-theme #login-container, .snakes-theme #character-selection:not(.theme-layout-v2) { position: relative; z-index: 1; background: transparent !important; }
+body.snakes-theme .hidden, .snakes-theme .hidden { display: none !important; }
+body.snakes-theme .login-box, body.snakes-theme .login-options, body.snakes-theme .login-notice, body.snakes-theme .display-name-card, body.snakes-theme .character-perk-display, body.snakes-theme .board-status, body.snakes-theme .info-card, body.snakes-theme .board-grid-frame, body.snakes-theme .modal-content, body.snakes-theme .leaderboard-content, body.snakes-theme .question-modal-content, body.snakes-theme .online-players-content, body.snakes-theme .player-stats, .snakes-theme .login-box, .snakes-theme .login-options, .snakes-theme .login-notice, .snakes-theme .display-name-card, .snakes-theme .character-perk-display, .snakes-theme .board-status, .snakes-theme .info-card, .snakes-theme .board-grid-frame, .snakes-theme .modal-content, .snakes-theme .leaderboard-content, .snakes-theme .question-modal-content, .snakes-theme .online-players-content, .snakes-theme .player-stats { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; }
+body.snakes-theme p, body.snakes-theme li, body.snakes-theme label, body.snakes-theme span, body.snakes-theme small, body.snakes-theme .mode-description, body.snakes-theme .mode-features li, .snakes-theme p, .snakes-theme li, .snakes-theme label, .snakes-theme span, .snakes-theme small, .snakes-theme .mode-description, .snakes-theme .mode-features li { color: var(--muted-text); }
+body.snakes-theme h1, body.snakes-theme h2, body.snakes-theme h3, body.snakes-theme h4, body.snakes-theme h5, body.snakes-theme h6, body.snakes-theme .stat-value, body.snakes-theme .player-name-label, body.snakes-theme .mode-title, .snakes-theme h1, .snakes-theme h2, .snakes-theme h3, .snakes-theme h4, .snakes-theme h5, .snakes-theme h6, .snakes-theme .stat-value, .snakes-theme .player-name-label, .snakes-theme .mode-title { color: var(--heading); }
+body.snakes-theme a, .snakes-theme a { color: var(--accent); }
+body.snakes-theme a:hover, .snakes-theme a:hover { color: var(--accent-2); }
+body.snakes-theme input, body.snakes-theme select, body.snakes-theme textarea, .snakes-theme input, .snakes-theme select, .snakes-theme textarea { background: rgba(12, 16, 26, 0.75); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); }
+body.snakes-theme table, body.snakes-theme th, body.snakes-theme td, .snakes-theme table, .snakes-theme th, .snakes-theme td { color: #ffffff; }
+body.snakes-theme .leaderboard-table-container, body.snakes-theme #leaderboard-table, .snakes-theme .leaderboard-table-container, .snakes-theme #leaderboard-table { color: #ffffff; }
+body.snakes-theme .login-title, body.snakes-theme .page-title, body.snakes-theme .leaderboard-header h2, .snakes-theme .login-title, .snakes-theme .page-title, .snakes-theme .leaderboard-header h2 { color: var(--heading); text-shadow: 0 2px 10px rgba(15, 20, 35, 0.35); }
+body.snakes-theme .login-subtitle, body.snakes-theme .page-subtitle, body.snakes-theme .board-status p, body.snakes-theme .info-card p, body.snakes-theme .control-hint, body.snakes-theme .question-meta, body.snakes-theme .mode-description, .snakes-theme .login-subtitle, .snakes-theme .page-subtitle, .snakes-theme .board-status p, .snakes-theme .info-card p, .snakes-theme .control-hint, .snakes-theme .question-meta, .snakes-theme .mode-description { color: var(--muted-text); }
+body.snakes-theme .btn, body.snakes-theme .nav-btn, body.snakes-theme #controls button, body.snakes-theme .game-start-btn, body.snakes-theme .mode-card, body.snakes-theme .back-btn, body.snakes-theme .question-submit, body.snakes-theme .primary-login, body.snakes-theme .guest-login, .snakes-theme .btn, .snakes-theme .nav-btn, .snakes-theme #controls button, .snakes-theme .game-start-btn, .snakes-theme .mode-card, .snakes-theme .back-btn, .snakes-theme .question-submit, .snakes-theme .primary-login, .snakes-theme .guest-login { border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+body.snakes-theme .btn, body.snakes-theme .nav-btn, body.snakes-theme #controls button, body.snakes-theme .question-submit, body.snakes-theme .game-start-btn, .snakes-theme .btn, .snakes-theme .nav-btn, .snakes-theme #controls button, .snakes-theme .question-submit, .snakes-theme .game-start-btn { background: var(--button-bg); color: var(--button-text); border-color: rgba(255, 255, 255, 0.16); box-shadow: 0 12px 24px rgba(var(--accent-rgb), 0.24); }
+body.snakes-theme .btn:hover:not(:disabled), body.snakes-theme .nav-btn:hover:not(:disabled), body.snakes-theme #controls button:hover:not(:disabled), body.snakes-theme .question-submit:hover:not(:disabled), body.snakes-theme .game-start-btn:hover:not(:disabled), .snakes-theme .btn:hover:not(:disabled), .snakes-theme .nav-btn:hover:not(:disabled), .snakes-theme #controls button:hover:not(:disabled), .snakes-theme .question-submit:hover:not(:disabled), .snakes-theme .game-start-btn:hover:not(:disabled) { transform: translateY(-2px); background: var(--button-bg-hover); box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.32); }
+body.snakes-theme .primary-login, .snakes-theme .primary-login { background: var(--button-bg); }
+body.snakes-theme .guest-login, .snakes-theme .guest-login { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.26), rgba(31, 42, 54, 0.88)); }
+body.snakes-theme .status-pill, .snakes-theme .status-pill { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.4), rgba(var(--accent-2-rgb), 0.35)); color: var(--button-text); border-radius: 999px; padding: 4px 12px; font-weight: 700; box-shadow: 0 8px 18px rgba(var(--accent-rgb), 0.2); }
+body.snakes-theme .active-players-badge, .snakes-theme .active-players-badge { background: linear-gradient(135deg, var(--card-border), var(--accent)); box-shadow: 0 6px 16px rgba(var(--card-border-rgb), 0.35); }
+body.snakes-theme .board-grid-frame, .snakes-theme .board-grid-frame { border-radius: 12px; }
+body.snakes-theme #game-board, body.snakes-theme .game-board, .snakes-theme #game-board, .snakes-theme .game-board { background: rgba(0, 0, 0, 0.35); border-radius: 10px; }
+body.snakes-theme .question-header, body.snakes-theme .question-body .arcade-zone, .snakes-theme .question-header, .snakes-theme .question-body .arcade-zone { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.38), rgba(var(--accent-2-rgb), 0.34)); }
+body.snakes-theme #question-prompt, body.snakes-theme .question-prompt, .snakes-theme #question-prompt, .snakes-theme .question-prompt { color: var(--heading); }
+body.snakes-theme .question-options label, .snakes-theme .question-options label { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.18); color: var(--muted-text); }
+body.snakes-theme .question-options label:hover, .snakes-theme .question-options label:hover { background: rgba(255, 255, 255, 0.16); }
+body.snakes-theme .question-options label:has(input:checked), .snakes-theme .question-options label:has(input:checked) { background: rgba(var(--accent-rgb), 0.2); border-color: rgba(var(--accent-rgb), 0.45); color: #fff; }
+body.snakes-theme #question-options, body.snakes-theme .question-options, body.snakes-theme .question-meta, body.snakes-theme #question-meta, .snakes-theme #question-options, .snakes-theme .question-options, .snakes-theme .question-meta, .snakes-theme #question-meta { color: var(--muted-text); }
+body.snakes-theme .question-submit, .snakes-theme .question-submit { background: var(--button-bg); }
+body.snakes-theme .lesson-body .container, .snakes-theme .lesson-body .container { background: var(--panel-bg) !important; border: 2px solid var(--panel-border); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: var(--heading); }
+body.snakes-theme .lesson-body .header, .snakes-theme .lesson-body .header { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.42), rgba(var(--accent-2-rgb), 0.38)) !important; color: var(--heading); }
+body.snakes-theme .lesson-body .section h2, .snakes-theme .lesson-body .section h2 { color: var(--heading); }
+body.snakes-theme .lesson-body .section p, body.snakes-theme .lesson-body .content p, body.snakes-theme .lesson-body .content li, body.snakes-theme .lesson-body .question p, body.snakes-theme .lesson-body .question label, body.snakes-theme .lesson-body .question span, .snakes-theme .lesson-body .section p, .snakes-theme .lesson-body .content p, .snakes-theme .lesson-body .content li, .snakes-theme .lesson-body .question p, .snakes-theme .lesson-body .question label, .snakes-theme .lesson-body .question span { color: var(--muted-text); }
+body.snakes-theme .lesson-body .content p[style], .snakes-theme .lesson-body .content p[style] { color: var(--muted-text) !important; }
+body.snakes-theme .lesson-body .question, .snakes-theme .lesson-body .question { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.32), rgba(var(--accent-2-rgb), 0.28)) !important; border: 1px solid rgba(var(--accent-rgb), 0.3); color: var(--heading); }
+body.snakes-theme .lesson-body .options label, .snakes-theme .lesson-body .options label { background: rgba(255, 255, 255, 0.12) !important; border: 2px solid rgba(255, 255, 255, 0.2) !important; }
+body.snakes-theme .lesson-body .options label:has(input:checked), .snakes-theme .lesson-body .options label:has(input:checked) { background: rgba(var(--accent-rgb), 0.25) !important; border-color: rgba(var(--accent-rgb), 0.55) !important; }
+body.snakes-theme .mode-card, .snakes-theme .mode-card { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; border-width: 3px; }
+body.snakes-theme .mode-card.boss-mode, .snakes-theme .mode-card.boss-mode { border-color: var(--mode-boss-border); }
+body.snakes-theme .mode-card.pvp-mode, .snakes-theme .mode-card.pvp-mode { border-color: var(--mode-pvp-border); }
+body.snakes-theme .game-header, body.snakes-theme .hud .stat-box, .snakes-theme .game-header, .snakes-theme .hud .stat-box { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; }
+body.snakes-theme .hud .stat-box, .snakes-theme .hud .stat-box { background: rgba(var(--accent-rgb), 0.28); }
+body.snakes-theme #locked-overlay, .snakes-theme #locked-overlay { background: rgba(4, 8, 18, 0.85); backdrop-filter: blur(6px); }
+body.snakes-theme .player-name-label, .snakes-theme .player-name-label { color: var(--accent-2) !important; text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.32); }
+body.snakes-theme .info-card, .snakes-theme .info-card { border-color: rgba(255, 255, 255, 0.18); }
+body.snakes-theme .info-card h3, .snakes-theme .info-card h3 { color: #e0e7ff; border-bottom: 1px solid rgba(255, 255, 255, 0.15); padding-bottom: 6px; margin-bottom: 8px; }
+body.snakes-theme .info-card p, .snakes-theme .info-card p { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.06); border-radius: 4px; padding: 4px 6px; margin: 4px 0; border-left: 2px solid var(--accent); }
+body.snakes-theme .info-card p span, .snakes-theme .info-card p span { color: #fbbf24; font-weight: 700; }
+body.snakes-theme .info-card .perk-line, .snakes-theme .info-card .perk-line { font-size: 0.85em; font-style: italic; border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.08); margin-top: 0; }
+body.snakes-theme .info-card .perk-line span, .snakes-theme .info-card .perk-line span { color: #fcd34d; font-weight: 600; }
+body.snakes-theme .control-hint, .snakes-theme .control-hint { color: var(--muted-text) !important; font-style: italic; }
+body.snakes-theme .dice-widget, .snakes-theme .dice-widget { flex-direction: column; align-items: center; gap: 6px; }
+body.snakes-theme .dice-widget .physical-dice, .snakes-theme .dice-widget .physical-dice { position: relative; overflow: hidden; width: 60px !important; height: 60px !important; min-width: 60px !important; max-width: 60px !important; padding: 0 !important; flex: 0 0 60px; border-radius: 12px; }
+body.snakes-theme .dice-widget .physical-dice::before, .snakes-theme .dice-widget .physical-dice::before { content: ''; position: absolute; inset: 7px; border-radius: 10px; background: radial-gradient(circle at 28% 28%, #111827 0 5px, transparent 6px), radial-gradient(circle at 72% 72%, #111827 0 5px, transparent 6px), radial-gradient(circle at 28% 72%, #111827 0 5px, transparent 6px), radial-gradient(circle at 72% 28%, #111827 0 5px, transparent 6px), radial-gradient(circle at 50% 50%, #111827 0 5px, transparent 6px), linear-gradient(145deg, #ffffff 0%, #f0f0f0 60%, #e2e2e2 100%); box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8), inset 0 -2px 4px rgba(0, 0, 0, 0.2); }
+body.snakes-theme .physical-dice, .snakes-theme .physical-dice { width: 44px; height: 44px; aspect-ratio: 1 / 1; border-radius: 8px; background: linear-gradient(145deg, #fefefe 0%, #e8e6e1 60%, #d4d0c8 100%); border: 2px solid #c9a84c; box-shadow: 3px 3px 0 0 #b8860b, 5px 5px 0 0 #8b6914, 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.6); cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+body.snakes-theme .physical-dice:hover, .snakes-theme .physical-dice:hover { transform: translateY(-2px) rotate(-5deg); box-shadow: 4px 4px 0 0 #b8860b, 6px 6px 0 0 #8b6914, 0 12px 25px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.6); }
+body.snakes-theme .physical-dice:active, .snakes-theme .physical-dice:active { transform: translateY(1px); box-shadow: 1px 1px 0 0 #b8860b, 2px 2px 0 0 #8b6914, 0 4px 10px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.4); }
+body.snakes-theme .dice-label, .snakes-theme .dice-label { color: var(--muted-text); font-size: 0.75em; letter-spacing: 0.5px; text-transform: uppercase; }
+body.snakes-theme .board-status h3, .snakes-theme .board-status h3 { color: #ffffff; }
+body.snakes-theme .board-status p, .snakes-theme .board-status p { color: var(--muted-text); background: transparent; border-left: none; padding: 0; margin: 2px 0; }
+body.snakes-theme .section2-instructions-content, .snakes-theme .section2-instructions-content { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 2px solid rgba(var(--accent-rgb), 0.35); }
+body.snakes-theme .section2-instructions-content h2, .snakes-theme .section2-instructions-content h2 { color: var(--accent); text-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.3); }
+body.snakes-theme .section2-instructions-content p, .snakes-theme .section2-instructions-content p { color: rgba(255, 255, 255, 0.92); background: transparent; border-left: none; padding: 0; }
+body.snakes-theme .section2-instructions-content .instructions-list, .snakes-theme .section2-instructions-content .instructions-list { background: rgba(var(--accent-rgb), 0.1); border: 1px solid rgba(var(--accent-rgb), 0.24); }
+body.snakes-theme .section2-instructions-content .instructions-list li, .snakes-theme .section2-instructions-content .instructions-list li { color: rgba(255, 255, 255, 0.92); }
+body.snakes-theme .section2-instructions-content .instructions-list li::before, .snakes-theme .section2-instructions-content .instructions-list li::before { color: var(--accent); }
+body.snakes-theme .section2-instructions-content .dismiss-text, .snakes-theme .section2-instructions-content .dismiss-text { color: rgba(255, 255, 255, 0.7); }
+body.snakes-theme .section2-instructions-content .auto-dismiss-timer, .snakes-theme .section2-instructions-content .auto-dismiss-timer { background: rgba(var(--accent-rgb), 0.2); color: var(--accent); }
+body.snakes-theme .roll-prompt-content, .snakes-theme .roll-prompt-content { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 2px solid var(--mode-koz-border); }
+body.snakes-theme .roll-prompt-content h2, .snakes-theme .roll-prompt-content h2 { color: var(--mode-koz-border); }
+body.snakes-theme .roll-prompt-content p, .snakes-theme .roll-prompt-content p { color: rgba(255, 255, 255, 0.92); background: transparent; border-left: none; padding: 0; }
+body.snakes-theme .game-landing-container, .snakes-theme .game-landing-container { position: relative; min-height: 100vh; overflow: hidden; background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%); }
+body.snakes-theme .pixel-background, .snakes-theme .pixel-background { position: absolute; inset: 0; z-index: 1; opacity: 0.35; mix-blend-mode: screen; }
+body.snakes-theme #login-container, .snakes-theme #login-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 20px; background: transparent; position: relative; z-index: 10; }
+body.snakes-theme #login-container::before, .snakes-theme #login-container::before { background: radial-gradient(circle at 20% 50%, rgba(var(--accent-rgb), 0.14) 0%, transparent 55%), radial-gradient(circle at 80% 80%, rgba(var(--accent-2-rgb), 0.12) 0%, transparent 55%); }
+body.snakes-theme .login-hero, .snakes-theme .login-hero { text-align: center; margin-bottom: 40px; z-index: 2; }
+body.snakes-theme .login-icon, .snakes-theme .login-icon { font-size: 72px; margin-bottom: 18px; text-shadow: 0 12px 24px rgba(8, 12, 20, 0.45); }
+body.snakes-theme .login-title, .snakes-theme .login-title { font-size: clamp(2rem, 3.2vw, 2.7rem); color: #f5f7ff; text-shadow: 0 2px 16px rgba(12, 16, 30, 0.45); }
+body.snakes-theme .login-subtitle, .snakes-theme .login-subtitle { font-size: 1.05rem; color: var(--muted-text); }
+body.snakes-theme .login-options, .snakes-theme .login-options { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; border-radius: 18px; padding: 36px; max-width: 520px; width: min(92vw, 520px); z-index: 2; }
+body.snakes-theme .login-btn, .snakes-theme .login-btn { width: 100%; padding: 18px 22px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.18); color: #f7fafc; text-align: left; gap: 16px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+body.snakes-theme .login-btn::before, .snakes-theme .login-btn::before { background: rgba(255, 255, 255, 0.08); }
+body.snakes-theme .login-btn:hover, .snakes-theme .login-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(10, 16, 28, 0.45); }
+body.snakes-theme .primary-login, .snakes-theme .primary-login { background: var(--button-bg); box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.36); }
+body.snakes-theme .guest-login, .snakes-theme .guest-login { background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.26), rgba(31, 42, 54, 0.88)); box-shadow: 0 12px 28px rgba(22, 32, 42, 0.45); }
+body.snakes-theme .btn-title, .snakes-theme .btn-title { color: #ffffff; }
+body.snakes-theme .btn-description, .snakes-theme .btn-description { color: var(--muted-text); }
+body.snakes-theme .login-divider span, .snakes-theme .login-divider span { background: rgba(10, 14, 22, 0.85); color: var(--muted-text); }
+body.snakes-theme .login-divider::before, body.snakes-theme .login-divider::after, .snakes-theme .login-divider::before, .snakes-theme .login-divider::after { background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent); }
+body.snakes-theme .login-footer, .snakes-theme .login-footer { margin-top: 26px; z-index: 2; }
+body.snakes-theme .login-notice, .snakes-theme .login-notice { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; border-radius: 14px; padding: 16px 20px; color: var(--muted-text); display: flex; align-items: flex-start; gap: 12px; }
+body.snakes-theme .guest-display-panel, .snakes-theme .guest-display-panel { margin-top: 20px; background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; border-radius: 16px; padding: 20px 22px; text-align: left; }
+body.snakes-theme .guest-display-panel h3, .snakes-theme .guest-display-panel h3 { margin: 0 0 8px 0; color: #f5f7ff; }
+body.snakes-theme .guest-display-panel p, .snakes-theme .guest-display-panel p { margin: 0 0 12px 0; color: var(--muted-text); }
+body.snakes-theme .guest-display-panel input, .snakes-theme .guest-display-panel input { width: 100%; margin-bottom: 12px; }
+body.snakes-theme .guest-display-actions, .snakes-theme .guest-display-actions { display: flex; gap: 12px; justify-content: flex-end; }
+body.snakes-theme .guest-display-actions button, .snakes-theme .guest-display-actions button { padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); color: #f7fafc; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+body.snakes-theme .guest-display-actions button:hover, .snakes-theme .guest-display-actions button:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(10, 16, 28, 0.35); }
+body.snakes-theme .guest-display-actions #guest-name-continue, .snakes-theme .guest-display-actions #guest-name-continue { background: var(--button-bg); }
+body.snakes-theme .display-name-modal, .snakes-theme .display-name-modal { z-index: 10003; }
+body.snakes-theme #character-selection:not(.theme-layout-v2), .snakes-theme #character-selection:not(.theme-layout-v2) { text-align: center; padding: 0; margin: 0; min-height: 100vh; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; background: #15181f !important; }
+body.snakes-theme #character-selection:not(.theme-layout-v2)::before, .snakes-theme #character-selection:not(.theme-layout-v2)::before { background: transparent; }
+body.snakes-theme #character-selection:not(.theme-layout-v2)::after, .snakes-theme #character-selection:not(.theme-layout-v2)::after { content: ''; position: fixed; inset: 0; background: #15181f; z-index: 0; }
+body.snakes-theme #character-selection:not(.theme-layout-v2) h2, .snakes-theme #character-selection:not(.theme-layout-v2) h2 { color: var(--heading); text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.5); background: linear-gradient(45deg, var(--heading), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .character-carousel, .snakes-theme #character-selection:not(.theme-layout-v2) .character-carousel { background: #15181f; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 24px 18px; }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .character-card, .snakes-theme #character-selection:not(.theme-layout-v2) .character-card { background: rgba(10, 14, 22, 0.75); border: 2px solid rgba(255, 255, 255, 0.18); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.4); }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .character-card.center, .snakes-theme #character-selection:not(.theme-layout-v2) .character-card.center { border-color: rgba(var(--accent-rgb), 0.72); box-shadow: 0 16px 50px rgba(var(--accent-rgb), 0.35); }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .character-card.selected, .snakes-theme #character-selection:not(.theme-layout-v2) .character-card.selected { border-color: var(--mode-koz-border) !important; background: rgba(31, 41, 55, 0.9) !important; box-shadow: 0 0 50px var(--mode-koz-glow) !important; }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .carousel-btn, .snakes-theme #character-selection:not(.theme-layout-v2) .carousel-btn { background: var(--button-bg); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 10px 26px rgba(12, 18, 28, 0.5); }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .carousel-btn:hover, .snakes-theme #character-selection:not(.theme-layout-v2) .carousel-btn:hover { box-shadow: 0 14px 32px rgba(12, 18, 28, 0.6); }
+body.snakes-theme #character-selection:not(.theme-layout-v2) .game-start-btn, .snakes-theme #character-selection:not(.theme-layout-v2) .game-start-btn { background: var(--button-bg); color: var(--button-text); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.35); }
+body.snakes-theme .hint-bar, .snakes-theme .hint-bar { background: var(--panel-bg, rgba(10, 14, 22, 0.78)); border: 2px solid var(--panel-border, rgba(255, 255, 255, 0.12)); backdrop-filter: blur(10px); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5); color: #fff; border-radius: 16px; border-color: rgba(255, 255, 255, 0.16); }
+body.snakes-theme .hint-bar-toggle, .snakes-theme .hint-bar-toggle { background: var(--button-bg); border: 1px solid rgba(255, 255, 255, 0.18); color: var(--button-text); }
+body.snakes-theme .hint-bar-content, .snakes-theme .hint-bar-content { background: transparent; }
+body.snakes-theme .hint-bar-header, .snakes-theme .hint-bar-header { border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+body.snakes-theme .hint-bar-title h3, .snakes-theme .hint-bar-title h3 { color: #f5f7ff; }
+body.snakes-theme .hint-bar-title p, .snakes-theme .hint-bar-title p { color: var(--muted-text); }
+body.snakes-theme .hint-item, .snakes-theme .hint-item { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); color: #ffffff; }
+body.snakes-theme .hint-item:hover, .snakes-theme .hint-item:hover { background: rgba(255, 255, 255, 0.12); }
+body.snakes-theme .hint-item h4, .snakes-theme .hint-item h4 { color: #ffffff; }
+body.snakes-theme .hint-item p, body.snakes-theme .hint-item .hint-tip, .snakes-theme .hint-item p, .snakes-theme .hint-item .hint-tip { color: var(--muted-text); }
+body.snakes-theme .hint-bar-content::-webkit-scrollbar-track, .snakes-theme .hint-bar-content::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.08); }
+body.snakes-theme .hint-bar-content::-webkit-scrollbar-thumb, .snakes-theme .hint-bar-content::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.5); }
+body.snakes-theme .hint-bar-content::-webkit-scrollbar-thumb:hover, .snakes-theme .hint-bar-content::-webkit-scrollbar-thumb:hover { background: rgba(var(--accent-rgb), 0.7); }
+
+body.snakes-theme .mode-card { background: rgba(5, 9, 18, 0.62); border-color: rgba(255, 255, 255, 0.18); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+body.snakes-theme .mode-card.boss-mode { border-color: var(--mode-boss-border); }
+body.snakes-theme .mode-card.pvp-mode { border-color: var(--mode-pvp-border); }
+body.snakes-theme .mode-card.koz-mode { border: 3px solid var(--mode-koz-border); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+body.snakes-theme .mode-card.boss-mode:hover { box-shadow: 0 24px 48px rgba(var(--accent-rgb), 0.3); }
+body.snakes-theme .mode-card.pvp-mode:hover { box-shadow: 0 24px 48px rgba(var(--accent-2-rgb), 0.3); }
+body.snakes-theme .mode-card.koz-mode:hover { box-shadow: 0 22px 48px var(--mode-koz-glow); }
+body.snakes-theme .boss-mode .mode-title { color: var(--mode-boss-border); }
+body.snakes-theme .pvp-mode .mode-title { color: var(--mode-pvp-border); }
+body.snakes-theme .koz-mode .mode-title { color: var(--mode-koz-border); }
+body.snakes-theme .boss-mode .mode-status, body.snakes-theme .pvp-mode .mode-status, body.snakes-theme .koz-mode .mode-status { color: var(--heading); border: 1px solid rgba(255, 255, 255, 0.18); }
+body.snakes-theme .boss-mode .mode-status { background: rgba(var(--accent-rgb), 0.22); }
+body.snakes-theme .pvp-mode .mode-status { background: rgba(var(--accent-2-rgb), 0.2); }
+body.snakes-theme .koz-mode .mode-status { background: rgba(var(--card-border-rgb), 0.2); }
+body.snakes-theme #gameCanvas { border-color: var(--accent); }
+body.snakes-theme .sidebar, body.snakes-theme .player-stats, body.snakes-theme .champions-section, body.snakes-theme .player-hud .stat-box, body.snakes-theme .hud .stat-box, body.snakes-theme .overlay .modal, body.snakes-theme .game-over-content { border-color: rgba(var(--accent-rgb), 0.35); }
+body.snakes-theme .sidebar { border-left-color: var(--accent); }
+body.snakes-theme .sidebar-title, body.snakes-theme .champions-title { color: var(--accent); }
+body.snakes-theme .stat-box.opponent { background: rgba(var(--accent-2-rgb), 0.34); }
+body.snakes-theme .hud-hp-fill, body.snakes-theme .health-fill.player { background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%); }
+body.snakes-theme .hud-hp-fill.opponent { background: linear-gradient(90deg, var(--mode-boss-border) 0%, var(--mode-koz-border) 100%); }
+body.snakes-theme .victory-title { background: linear-gradient(135deg, var(--mode-koz-border) 0%, var(--accent-2) 50%, var(--mode-koz-border) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 22px rgba(var(--accent-rgb), 0.35)); }
+body.snakes-theme .player-stats { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.42); }
+body.snakes-theme .player-stats h3, body.snakes-theme .stat-value { color: var(--mode-koz-border); }
+body.snakes-theme .champion-card.you { border-color: var(--mode-koz-border); background: rgba(var(--accent-rgb), 0.18); }
+body.snakes-theme .page-title { background: linear-gradient(45deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 30px rgba(var(--accent-rgb), 0.28); }
+body.snakes-theme .page-subtitle, body.snakes-theme .victory-subtitle, body.snakes-theme .champion-date { color: var(--muted-text); }
+body.snakes-theme .spinner { border-top-color: var(--accent); }
+body.snakes-theme .btn:focus-visible, body.snakes-theme .back-btn:focus-visible, body.snakes-theme .carousel-btn:focus-visible, body.snakes-theme .game-start-btn:focus-visible, body.snakes-theme .question-submit:focus-visible, body.snakes-theme .mode-card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring), 0 0 0 6px rgba(var(--accent-rgb), 0.26); }
+
+body.snakes-theme.koz-mode { --koz-panel: rgba(8, 12, 22, 0.82); --koz-panel-border: rgba(var(--accent-rgb), 0.35); --koz-accent: var(--accent); --koz-warning: var(--mode-koz-border); --koz-danger: var(--mode-boss-border); --koz-success: var(--card-border); --koz-muted: var(--muted-text); }
+body.snakes-theme.koz-mode #gameCanvas { background: radial-gradient(circle at 30% 20%, rgba(var(--accent-rgb), 0.24), rgba(5, 6, 14, 0.95)); border: 2px solid rgba(var(--accent-rgb), 0.35); }
+body.snakes-theme.koz-mode .modal button { background: var(--button-bg); color: var(--button-text); }
+
+.theme-quick-launch { position: fixed; right: clamp(12px, 2vw, 24px); bottom: clamp(12px, 2vw, 24px); width: 42px; height: 42px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); background: var(--button-bg); color: var(--button-text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1105; box-shadow: 0 10px 24px rgba(var(--accent-rgb, 102, 126, 234), 0.3); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+
+.theme-quick-launch:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(var(--accent-rgb, 102, 126, 234), 0.4); }
+
+.theme-quick-launch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring), 0 0 0 6px rgba(var(--accent-rgb, 102, 126, 234), 0.24); }
+
+.theme-selector-modal-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 8, 16, 0.72); backdrop-filter: blur(4px); z-index: 1200; }
+
+.theme-selector-modal-overlay.is-open { display: flex; }
+
+.theme-selector-modal { width: min(360px, 92vw); max-height: min(76vh, 660px); background: var(--panel-bg, rgba(10, 14, 22, 0.9)); border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.2)); border-radius: 16px; box-shadow: 0 22px 54px rgba(0, 0, 0, 0.45); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+.theme-selector-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.theme-selector-modal-header h3 { margin: 0; color: var(--heading); font-size: 1.05rem; }
+
+.theme-selector-modal-close { width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); color: var(--button-text); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+
+.theme-selector-modal-close:hover { background: rgba(255, 255, 255, 0.16); }
+
+.theme-selector-modal-close:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+
+.theme-selector-modal-subtitle { margin: 0; color: var(--muted-text); font-size: 0.84rem; }
+
+.theme-selector-modal .theme-options { display: grid; grid-template-columns: 1fr; gap: 8px; max-height: min(58vh, 520px); overflow-y: auto; padding-right: 2px; }
+
+.theme-selector-modal .theme-option { width: 100%; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; background: rgba(16, 24, 36, 0.72); color: var(--heading); padding: 8px 10px; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; text-align: left; }
+
+.theme-selector-modal .theme-option:hover { border-color: rgba(255, 255, 255, 0.34); transform: translateY(-1px); }
+
+.theme-selector-modal .theme-option:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+
+.theme-selector-modal .theme-option.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 102, 126, 234), 0.35), 0 8px 20px rgba(var(--accent-rgb, 102, 126, 234), 0.2); }
+
+.theme-selector-modal .theme-swatch { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.25); background: linear-gradient(135deg, var(--swatch-1), var(--swatch-2)); }
+
+.theme-selector-modal .theme-option-label { flex: 1; font-size: 0.9rem; color: var(--heading); }
+
+.theme-selector-modal .theme-check { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #ffffff; font-size: 0.75rem; opacity: 0; transform: scale(0.6); transition: opacity 0.2s ease, transform 0.2s ease; }
+
+.theme-selector-modal .theme-option.is-selected .theme-check { opacity: 1; transform: scale(1); }
+
+@media (max-width: 900px) { body.snakes-theme .board-shell { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .theme-quick-launch { width: 40px; height: 40px; }
+  .theme-selector-modal { width: min(340px, 94vw); } }

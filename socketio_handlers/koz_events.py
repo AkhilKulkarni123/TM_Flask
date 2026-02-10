@@ -104,7 +104,7 @@ def init_koz_socket(socketio) -> None:
                 'sid': sid,
                 'role': role,
                 'room': _koz_manager.ROOM_NAME,
-                'map': {'width': _koz_manager.MAP_WIDTH, 'height': _koz_manager.MAP_HEIGHT},
+                'map': _koz_manager.serialize_map(),
                 'tickRate': int(round(1.0 / _koz_manager.TICK_INTERVAL)),
                 'snapshotRate': int(round(1.0 / _koz_manager.SNAPSHOT_INTERVAL)),
                 'minPlayers': _koz_manager.MIN_PLAYERS_TO_START,

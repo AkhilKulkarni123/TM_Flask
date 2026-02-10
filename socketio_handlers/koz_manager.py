@@ -191,6 +191,256 @@ class KozManager:
         self.state_seq = 0
 
         self.loop_started = False
+        self.map_pool = self._build_map_pool()
+        self.map_rotation_queue: List[Dict] = []
+        self.current_map: Dict = {}
+        self._select_next_map(initial=True)
+
+    def _build_map_pool(self) -> List[Dict]:
+        return [
+            {
+                'id': 'core-crucible',
+                'name': 'Core Crucible',
+                'theme': 'nebula-night',
+                'biome': 'Control Grid',
+                'flavor': 'Balanced lanes with mirrored cover around center.',
+                'previewColor': '#79d9ff',
+                'zone': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                    'radius': 1260.0,
+                },
+                'core': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                },
+                'obstacles': [
+                    {'id': 'wall_tl', 'x': 820, 'y': 640, 'w': 680, 'h': 120},
+                    {'id': 'wall_tr', 'x': 2700, 'y': 640, 'w': 680, 'h': 120},
+                    {'id': 'wall_bl', 'x': 820, 'y': 2040, 'w': 680, 'h': 120},
+                    {'id': 'wall_br', 'x': 2700, 'y': 2040, 'w': 680, 'h': 120},
+                    {'id': 'pillar_l', 'x': 1490, 'y': 1150, 'w': 140, 'h': 500},
+                    {'id': 'pillar_r', 'x': 2570, 'y': 1150, 'w': 140, 'h': 500},
+                    {'id': 'mid_top', 'x': 1880, 'y': 840, 'w': 440, 'h': 110},
+                    {'id': 'mid_bot', 'x': 1880, 'y': 1850, 'w': 440, 'h': 110},
+                ],
+                'spawnPoints': [
+                    (560, 560), (2100, 420), (3640, 560),
+                    (560, 1400), (3640, 1400),
+                    (560, 2240), (2100, 2380), (3640, 2240),
+                    (1180, 980), (3020, 980), (1180, 1820), (3020, 1820),
+                ],
+                'powerupSpawns': [
+                    (1050, 1050), (2100, 1040), (3150, 1050),
+                    (1050, 1760), (2100, 1760), (3150, 1760),
+                    (1570, 1400), (2630, 1400),
+                ],
+            },
+            {
+                'id': 'dune-circuit',
+                'name': 'Dune Circuit',
+                'theme': 'sunset-dunes',
+                'biome': 'Outpost Ruins',
+                'flavor': 'Wide side lanes with risky mid choke crossfire.',
+                'previewColor': '#ffbe6b',
+                'zone': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                    'radius': 1240.0,
+                },
+                'core': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                },
+                'obstacles': [
+                    {'id': 'dune_top_l', 'x': 540, 'y': 520, 'w': 860, 'h': 130},
+                    {'id': 'dune_top_r', 'x': 2800, 'y': 520, 'w': 860, 'h': 130},
+                    {'id': 'dune_bot_l', 'x': 540, 'y': 2150, 'w': 860, 'h': 130},
+                    {'id': 'dune_bot_r', 'x': 2800, 'y': 2150, 'w': 860, 'h': 130},
+                    {'id': 'dune_mid_l', 'x': 1570, 'y': 930, 'w': 170, 'h': 930},
+                    {'id': 'dune_mid_r', 'x': 2460, 'y': 930, 'w': 170, 'h': 930},
+                    {'id': 'dune_lane_top', 'x': 1870, 'y': 780, 'w': 460, 'h': 100},
+                    {'id': 'dune_lane_bot', 'x': 1870, 'y': 1920, 'w': 460, 'h': 100},
+                    {'id': 'dune_cut_top', 'x': 1960, 'y': 1120, 'w': 280, 'h': 90},
+                    {'id': 'dune_cut_bot', 'x': 1960, 'y': 1600, 'w': 280, 'h': 90},
+                ],
+                'spawnPoints': [
+                    (500, 480), (2100, 380), (3700, 480),
+                    (500, 1400), (3700, 1400),
+                    (500, 2320), (2100, 2420), (3700, 2320),
+                    (1150, 960), (3050, 960), (1150, 1840), (3050, 1840),
+                ],
+                'powerupSpawns': [
+                    (980, 980), (2100, 930), (3220, 980),
+                    (980, 1820), (2100, 1870), (3220, 1820),
+                    (1580, 1400), (2620, 1400),
+                ],
+            },
+            {
+                'id': 'neon-split',
+                'name': 'Neon Split',
+                'theme': 'neon-grid',
+                'biome': 'Cyber Junction',
+                'flavor': 'Tight center split with flank portals on both sides.',
+                'previewColor': '#8ac7ff',
+                'zone': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                    'radius': 1180.0,
+                },
+                'core': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                },
+                'obstacles': [
+                    {'id': 'neon_gate_l', 'x': 760, 'y': 680, 'w': 220, 'h': 1440},
+                    {'id': 'neon_gate_r', 'x': 3220, 'y': 680, 'w': 220, 'h': 1440},
+                    {'id': 'neon_top_bar', 'x': 1320, 'y': 620, 'w': 1560, 'h': 120},
+                    {'id': 'neon_bot_bar', 'x': 1320, 'y': 2060, 'w': 1560, 'h': 120},
+                    {'id': 'neon_center_v', 'x': 1990, 'y': 980, 'w': 220, 'h': 840},
+                    {'id': 'neon_center_h', 'x': 1680, 'y': 1290, 'w': 840, 'h': 220},
+                    {'id': 'neon_inner_tl', 'x': 1440, 'y': 980, 'w': 220, 'h': 180},
+                    {'id': 'neon_inner_tr', 'x': 2540, 'y': 980, 'w': 220, 'h': 180},
+                    {'id': 'neon_inner_bl', 'x': 1440, 'y': 1620, 'w': 220, 'h': 180},
+                    {'id': 'neon_inner_br', 'x': 2540, 'y': 1620, 'w': 220, 'h': 180},
+                ],
+                'spawnPoints': [
+                    (600, 520), (2100, 430), (3600, 520),
+                    (600, 1400), (3600, 1400),
+                    (600, 2280), (2100, 2370), (3600, 2280),
+                    (1280, 860), (2920, 860), (1280, 1940), (2920, 1940),
+                ],
+                'powerupSpawns': [
+                    (1000, 760), (2100, 760), (3200, 760),
+                    (1000, 2040), (2100, 2040), (3200, 2040),
+                    (1560, 1400), (2640, 1400),
+                ],
+            },
+            {
+                'id': 'wild-bastion',
+                'name': 'Wild Bastion',
+                'theme': 'jungle-monsoon',
+                'biome': 'Overgrown Fortress',
+                'flavor': 'Ringed center and broken lanes reward rotations.',
+                'previewColor': '#8ff1b7',
+                'zone': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                    'radius': 1260.0,
+                },
+                'core': {
+                    'x': self.MAP_WIDTH / 2.0,
+                    'y': self.MAP_HEIGHT / 2.0,
+                },
+                'obstacles': [
+                    {'id': 'wild_top_l', 'x': 700, 'y': 500, 'w': 640, 'h': 140},
+                    {'id': 'wild_top_m', 'x': 1820, 'y': 500, 'w': 560, 'h': 130},
+                    {'id': 'wild_top_r', 'x': 2860, 'y': 500, 'w': 640, 'h': 140},
+                    {'id': 'wild_mid_l', 'x': 920, 'y': 900, 'w': 170, 'h': 730},
+                    {'id': 'wild_mid_r', 'x': 3110, 'y': 900, 'w': 170, 'h': 730},
+                    {'id': 'wild_ring_top', 'x': 1710, 'y': 980, 'w': 780, 'h': 120},
+                    {'id': 'wild_ring_bot', 'x': 1710, 'y': 1700, 'w': 780, 'h': 120},
+                    {'id': 'wild_ring_l', 'x': 1710, 'y': 1100, 'w': 120, 'h': 600},
+                    {'id': 'wild_ring_r', 'x': 2370, 'y': 1100, 'w': 120, 'h': 600},
+                    {'id': 'wild_bot_l', 'x': 700, 'y': 2160, 'w': 640, 'h': 140},
+                    {'id': 'wild_bot_m', 'x': 1820, 'y': 2160, 'w': 560, 'h': 130},
+                    {'id': 'wild_bot_r', 'x': 2860, 'y': 2160, 'w': 640, 'h': 140},
+                ],
+                'spawnPoints': [
+                    (520, 620), (2100, 400), (3680, 620),
+                    (520, 1400), (3680, 1400),
+                    (520, 2180), (2100, 2440), (3680, 2180),
+                    (1240, 1140), (2960, 1140), (1240, 1660), (2960, 1660),
+                ],
+                'powerupSpawns': [
+                    (900, 1040), (2100, 930), (3300, 1040),
+                    (900, 1760), (2100, 1870), (3300, 1760),
+                    (1500, 1400), (2700, 1400),
+                ],
+            },
+        ]
+
+    def _rebuild_map_rotation_queue(self) -> None:
+        self.map_rotation_queue = [dict(item) for item in self.map_pool]
+        random.shuffle(self.map_rotation_queue)
+        current_id = self.current_map.get('id')
+        if current_id and len(self.map_rotation_queue) > 1 and self.map_rotation_queue[0].get('id') == current_id:
+            self.map_rotation_queue.append(self.map_rotation_queue.pop(0))
+
+    def _select_next_map(self, initial: bool = False) -> Dict:
+        if not self.map_pool:
+            self.current_map = {
+                'id': 'fallback',
+                'name': 'Fallback Arena',
+                'theme': 'nebula-night',
+                'biome': 'Control Grid',
+                'flavor': 'Default arena layout.',
+                'previewColor': '#79d9ff',
+                'zone': {'x': self.MAP_WIDTH / 2.0, 'y': self.MAP_HEIGHT / 2.0, 'radius': self.INITIAL_ZONE_RADIUS},
+                'core': {'x': self.MAP_WIDTH / 2.0, 'y': self.MAP_HEIGHT / 2.0},
+                'obstacles': list(self.OBSTACLES),
+                'spawnPoints': list(self.SPAWN_POINTS),
+                'powerupSpawns': list(self.POWERUP_SPAWNS),
+            }
+        else:
+            if initial:
+                self.map_rotation_queue = [dict(item) for item in self.map_pool]
+                random.shuffle(self.map_rotation_queue)
+            if not self.map_rotation_queue:
+                self._rebuild_map_rotation_queue()
+            self.current_map = self.map_rotation_queue.pop(0)
+
+        self.OBSTACLES = [dict(item) for item in self.current_map.get('obstacles', [])]
+        self.SPAWN_POINTS = [
+            (float(point[0]), float(point[1]))
+            for point in self.current_map.get('spawnPoints', [])
+            if isinstance(point, (list, tuple)) and len(point) >= 2
+        ]
+        self.POWERUP_SPAWNS = [
+            (float(point[0]), float(point[1]))
+            for point in self.current_map.get('powerupSpawns', [])
+            if isinstance(point, (list, tuple)) and len(point) >= 2
+        ]
+        return self.current_map
+
+    def _map_zone_center(self) -> Tuple[float, float]:
+        zone = self.current_map.get('zone', {})
+        return float(zone.get('x', self.MAP_WIDTH / 2.0)), float(zone.get('y', self.MAP_HEIGHT / 2.0))
+
+    def _map_zone_radius(self) -> float:
+        zone = self.current_map.get('zone', {})
+        return float(zone.get('radius', self.INITIAL_ZONE_RADIUS))
+
+    def _map_core_spawn(self) -> Tuple[float, float]:
+        core = self.current_map.get('core', {})
+        cx = core.get('x')
+        cy = core.get('y')
+        if cx is None or cy is None:
+            return self._map_zone_center()
+        return float(cx), float(cy)
+
+    def serialize_map(self) -> Dict:
+        zone_x, zone_y = self._map_zone_center()
+        core_x, core_y = self._map_core_spawn()
+        return {
+            'id': self.current_map.get('id', 'core-crucible'),
+            'name': self.current_map.get('name', 'Core Crucible'),
+            'theme': self.current_map.get('theme', 'nebula-night'),
+            'biome': self.current_map.get('biome', 'Control Grid'),
+            'flavor': self.current_map.get('flavor', ''),
+            'previewColor': self.current_map.get('previewColor', '#79d9ff'),
+            'width': self.MAP_WIDTH,
+            'height': self.MAP_HEIGHT,
+            'zone': {
+                'x': zone_x,
+                'y': zone_y,
+                'radius': self._map_zone_radius(),
+            },
+            'core': {
+                'x': core_x,
+                'y': core_y,
+            },
+        }
 
     def normalize_hero(self, hero: Optional[str]) -> str:
         key = str(hero or '').strip().lower()
@@ -215,7 +465,7 @@ class KozManager:
 
     def _next_spawn(self, idx: int) -> Tuple[float, float]:
         if not self.SPAWN_POINTS:
-            return self.MAP_WIDTH / 2.0, self.MAP_HEIGHT / 2.0
+            return self._map_zone_center()
         x, y = self.SPAWN_POINTS[idx % len(self.SPAWN_POINTS)]
         return float(x), float(y)
 
@@ -309,9 +559,10 @@ class KozManager:
             return None
 
         if self.core.get('heldBy') == sid:
+            core_x, core_y = self._map_core_spawn()
             self.core['heldBy'] = None
-            self.core['x'] = player.get('x', self.MAP_WIDTH / 2.0)
-            self.core['y'] = player.get('y', self.MAP_HEIGHT / 2.0)
+            self.core['x'] = player.get('x', core_x)
+            self.core['y'] = player.get('y', core_y)
             self.core['dropUnlockAt'] = time.time() + 0.8
 
         for projectile_id, projectile in list(self.projectiles.items()):
@@ -343,10 +594,12 @@ class KozManager:
             player['spectator'] = False
 
     def reset_zone(self, now: float) -> None:
-        self.zone['x'] = self.MAP_WIDTH / 2.0
-        self.zone['y'] = self.MAP_HEIGHT / 2.0
-        self.zone['radius'] = float(self.INITIAL_ZONE_RADIUS)
-        self.zone['targetRadius'] = float(self.INITIAL_ZONE_RADIUS)
+        zone_x, zone_y = self._map_zone_center()
+        start_radius = self._map_zone_radius()
+        self.zone['x'] = zone_x
+        self.zone['y'] = zone_y
+        self.zone['radius'] = float(start_radius)
+        self.zone['targetRadius'] = float(start_radius)
         self.zone['shrinkStart'] = 0.0
         self.zone['shrinkEnd'] = 0.0
         self.zone['nextShrinkAt'] = now + self.SHRINK_INTERVAL_SECONDS
@@ -369,8 +622,9 @@ class KozManager:
 
         self.reset_zone(now)
 
-        self.core['x'] = self.MAP_WIDTH / 2.0
-        self.core['y'] = self.MAP_HEIGHT / 2.0
+        core_x, core_y = self._map_core_spawn()
+        self.core['x'] = core_x
+        self.core['y'] = core_y
         self.core['heldBy'] = None
         self.core['dropUnlockAt'] = now + 1.0
 
@@ -411,6 +665,7 @@ class KozManager:
             'timeLeft': int(round(self.time_left)),
             'startedAt': now,
             'scoreTarget': self.SCORE_TARGET,
+            'map': self.serialize_map(),
         }, room=self.ROOM_NAME)
 
     def finish_match(self, now: float, reason: str = 'time') -> None:
@@ -430,6 +685,7 @@ class KozManager:
             'winner': winner,
             'results': results,
             'resetIn': self.RESULTS_SECONDS,
+            'map': self.serialize_map(),
         }
         self.socketio.emit('koz:match_end', payload, room=self.ROOM_NAME)
         self.socketio.emit('koz:results', payload, room=self.ROOM_NAME)
@@ -465,10 +721,12 @@ class KozManager:
         self.powerups.clear()
         self.killfeed.clear()
 
+        self._select_next_map()
         self.reset_zone(now)
 
-        self.core['x'] = self.MAP_WIDTH / 2.0
-        self.core['y'] = self.MAP_HEIGHT / 2.0
+        core_x, core_y = self._map_core_spawn()
+        self.core['x'] = core_x
+        self.core['y'] = core_y
         self.core['heldBy'] = None
         self.core['dropUnlockAt'] = now + 0.8
 
@@ -492,6 +750,7 @@ class KozManager:
             player['coreSeconds'] = 0
 
         self.socketio.emit('koz:match_state', self.serialize_match_state(now), room=self.ROOM_NAME)
+        self.socketio.emit('koz:lobby_update', self.serialize_lobby(now), room=self.ROOM_NAME)
 
     def evaluate_state_machine(self, now: float) -> None:
         active_count = self._active_player_count()
@@ -604,6 +863,7 @@ class KozManager:
             'active_players': self._active_player_count(),
             'spectators': len([p for p in self.players.values() if p.get('spectator')]),
             'countdown': countdown,
+            'map': self.serialize_map(),
             'players': players,
         }
 
@@ -631,6 +891,7 @@ class KozManager:
             'min_players': self.MIN_PLAYERS_TO_START,
             'activePlayers': self._active_player_count(),
             'active_players': self._active_player_count(),
+            'map': self.serialize_map(),
         }
 
     def serialize_snapshot(self, now: Optional[float] = None) -> Dict:
@@ -678,10 +939,7 @@ class KozManager:
             'seq': self.state_seq,
             'serverTime': now,
             'room': self.ROOM_NAME,
-            'map': {
-                'width': self.MAP_WIDTH,
-                'height': self.MAP_HEIGHT,
-            },
+            'map': self.serialize_map(),
             'match': {
                 'state': self.state,
                 'timeLeft': int(max(0, math.ceil(self.time_left))),
@@ -733,7 +991,7 @@ class KozManager:
                 }
                 for powerup_id, powerup in self.powerups.items()
             ],
-            'obstacles': self.OBSTACLES,
+            'obstacles': list(self.OBSTACLES),
             'scoreboard': self._scoreboard_entries(),
             'killfeed': self.killfeed[-6:],
         }

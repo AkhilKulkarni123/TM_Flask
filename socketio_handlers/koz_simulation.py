@@ -167,9 +167,10 @@ class KozSimulation:
             }, room=self.m.ROOM_NAME)
 
     def _drop_core(self, x: float, y: float, now: float) -> None:
+        fallback_x, fallback_y = self.m._map_core_spawn()
         self.m.core['heldBy'] = None
-        self.m.core['x'] = clamp(x, 30.0, self.m.MAP_WIDTH - 30.0)
-        self.m.core['y'] = clamp(y, 30.0, self.m.MAP_HEIGHT - 30.0)
+        self.m.core['x'] = clamp(float(x if x is not None else fallback_x), 30.0, self.m.MAP_WIDTH - 30.0)
+        self.m.core['y'] = clamp(float(y if y is not None else fallback_y), 30.0, self.m.MAP_HEIGHT - 30.0)
         self.m.core['dropUnlockAt'] = now + 0.8
 
     def _apply_damage(self, target_sid: str, target: Dict, attacker_sid: Optional[str], damage: float, reason: str, now: float, shooter_pos: Optional[Tuple[float, float]] = None) -> None:
@@ -308,10 +309,11 @@ class KozSimulation:
         if len(self.m.powerups) >= self.m.MAX_POWERUPS:
             return None
 
-        random.shuffle(self.m.POWERUP_SPAWNS)
+        spawn_points = list(self.m.POWERUP_SPAWNS)
+        random.shuffle(spawn_points)
         chosen = None
 
-        for sx, sy in self.m.POWERUP_SPAWNS:
+        for sx, sy in spawn_points:
             occupied = False
             for powerup in self.m.powerups.values():
                 if distance(sx, sy, powerup['x'], powerup['y']) < 50:
@@ -322,7 +324,9 @@ class KozSimulation:
                 break
 
         if not chosen:
-            chosen = random.choice(self.m.POWERUP_SPAWNS)
+            if not spawn_points:
+                return None
+            chosen = random.choice(spawn_points)
 
         ptype = random.choice(self.m.POWERUP_TYPES)
         self.m.powerup_seq += 1

@@ -17,16 +17,25 @@ LOBBY_ROOM = 'boss_lobby'
 
 MAX_PLAYERS_PER_ROOM = 10
 
-# PVP Arena state - max 2 players
-pvp_room = {
-    'players': {},  # { sid: player_data }
-    'player_order': [],  # [sid1, sid2] - order of joining
-    'battle_active': False,
-    'ready_players': set()
-}
-pvp_sid_mapping = {}  # { sid: True } - tracks who's in PVP
-PVP_ROOM_NAME = 'pvp_arena'
+# PVP Arena state - multiple rooms, max 2 players per room
+pvp_rooms = {}  # { room_id: { players, player_order, battle_active, ready_players } }
+pvp_sid_mapping = {}  # { sid: room_id } - tracks which PVP room a player is in
+PVP_ROOM_PREFIX = 'pvp_arena'
 MAX_PVP_PLAYERS = 2
+pvp_room_counter = 1
+
+# King of the Zone state - multiple rooms
+koz_rooms = {}  # { room_id: { players, team_scores, zone, timers, ... } }
+koz_sid_mapping = {}  # { sid: room_id }
+KOZ_ROOM_PREFIX = 'koz_arena'
+KOZ_MAX_PLAYERS = 12
+koz_room_counter = 1
+
+# Multiplayer collision tuning (server authoritative)
+# PVP sprite renders ~60px wide, so radius ~28-30 keeps collisions fair.
+PVP_PLAYER_RADIUS = 28
+# KOZ uses simple 12px circles client-side; 16px radius gives a forgiving buffer.
+KOZ_PLAYER_RADIUS = 16
 
 def init_boss_battle_socket(socketio):
 
@@ -664,6 +673,10 @@ def init_boss_battle_socket(socketio):
         if sid in pvp_sid_mapping:
             cleanup_pvp_player(sid)
 
+        # Clean up King of the Zone arena
+        if sid in koz_sid_mapping:
+            cleanup_koz_player(sid)
+
     # ==================== POWERUP SYSTEM ====================
     import random
     import time
@@ -895,84 +908,129 @@ def init_boss_battle_socket(socketio):
                 })
 
     # ==================== PVP ARENA HANDLERS ====================
-    # PVP state is defined at module level (pvp_room, pvp_sid_mapping, PVP_ROOM_NAME, MAX_PVP_PLAYERS)
+    # PVP state is defined at module level (pvp_rooms, pvp_sid_mapping, PVP_ROOM_PREFIX, MAX_PVP_PLAYERS)
 
-    def get_pvp_player_count():
-        """Get current number of players in PVP arena"""
-        return len(pvp_room['players'])
+    def get_pvp_room_name(room_id):
+        return f"{PVP_ROOM_PREFIX}_{room_id}"
 
-    def get_pvp_opponent(sid):
-        """Get the opponent's data for a given player"""
-        for player_sid, player_data in pvp_room['players'].items():
+    def create_pvp_room():
+        global pvp_room_counter
+        room_id = str(pvp_room_counter)
+        pvp_room_counter += 1
+        pvp_rooms[room_id] = {
+            'players': {},
+            'player_order': [],
+            'battle_active': False,
+            'ready_players': set()
+        }
+        return room_id
+
+    def get_or_create_open_room():
+        for room_id, room in pvp_rooms.items():
+            if len(room['players']) < MAX_PVP_PLAYERS:
+                return room_id, room
+        room_id = create_pvp_room()
+        return room_id, pvp_rooms[room_id]
+
+    def get_room_by_sid(sid):
+        room_id = pvp_sid_mapping.get(sid)
+        if room_id and room_id in pvp_rooms:
+            return room_id, pvp_rooms[room_id]
+        return None, None
+
+    def get_pvp_player_count(room):
+        return len(room['players'])
+
+    def get_pvp_opponent(room, sid):
+        for player_sid, player_data in room['players'].items():
             if player_sid != sid:
                 return {'sid': player_sid, **player_data}
         return None
 
+    def resolve_player_collision(desired_x, desired_y, other_x, other_y, min_dist):
+        """Return adjusted position so players do not overlap. Only moves the caller."""
+        dx = desired_x - other_x
+        dy = desired_y - other_y
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist < 0.001:
+            # Avoid divide-by-zero; push along x-axis
+            return other_x + min_dist, desired_y, True
+        if dist >= min_dist:
+            return desired_x, desired_y, False
+        overlap = min_dist - dist
+        nx = dx / dist
+        ny = dy / dist
+        return desired_x + nx * overlap, desired_y + ny * overlap, True
+
+    def get_pvp_aggregate_status():
+        total_players = sum(len(room['players']) for room in pvp_rooms.values())
+        active_rooms = len([room for room in pvp_rooms.values() if room['players']])
+        open_slots = sum(MAX_PVP_PLAYERS - len(room['players']) for room in pvp_rooms.values())
+        if open_slots == 0:
+            open_slots = MAX_PVP_PLAYERS  # room can be created on demand
+        return {
+            'totalPlayers': total_players,
+            'activeRooms': active_rooms,
+            'openSlots': open_slots
+        }
+
     def broadcast_pvp_status():
-        """Broadcast current PVP room status to all connected clients"""
-        socketio.emit('pvp_status', {
-            'playerCount': get_pvp_player_count(),
-            'isFull': get_pvp_player_count() >= MAX_PVP_PLAYERS,
-            'battleActive': pvp_room['battle_active']
-        })
+        socketio.emit('pvp_status', get_pvp_aggregate_status())
 
     @socketio.on('pvp_get_status')
     def handle_pvp_get_status(data):
-        """Return current PVP room status"""
-        emit('pvp_status', {
-            'playerCount': get_pvp_player_count(),
-            'isFull': get_pvp_player_count() >= MAX_PVP_PLAYERS,
-            'battleActive': pvp_room['battle_active']
-        })
+        """Return aggregate PVP status (mode selection) and room status if applicable"""
+        room_id, room = get_room_by_sid(request.sid)
+        if room:
+            emit('pvp_room_status', {
+                'roomId': room_id,
+                'playerCount': get_pvp_player_count(room),
+                'battleActive': room['battle_active']
+            })
+        emit('pvp_status', get_pvp_aggregate_status())
 
     @socketio.on('pvp_join')
     def handle_pvp_join(data):
-        """Handle player joining PVP arena"""
+        """Handle player joining PVP arena (assigns an open room or creates a new one)"""
         sid = request.sid
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
         bullets = data.get('bullets', 0)
         lives = data.get('lives', 5)
 
-        print(f"[PVP] Join request from {username} ({sid})")
-        print(f"[PVP] Current room state: players={list(pvp_room['players'].keys())}, count={get_pvp_player_count()}")
-
-        # Check if room is full (and player is NOT already in it)
-        if get_pvp_player_count() >= MAX_PVP_PLAYERS and sid not in pvp_room['players']:
-            emit('pvp_room_full', {'message': 'PVP arena is full (max 2 players)'})
-            return
-
-        # Check if player is already in the room (prevent duplicate joins)
-        if sid in pvp_room['players']:
-            print(f"[PVP] Player {username} ({sid}) already in arena, sending current state")
-            opponent = get_pvp_opponent(sid)
+        # If already in a room, just resend state
+        existing_room_id, existing_room = get_room_by_sid(sid)
+        if existing_room:
+            opponent = get_pvp_opponent(existing_room, sid)
             emit('pvp_room_state', {
-                'playerCount': get_pvp_player_count(),
-                'playerNumber': pvp_room['players'][sid]['player_number'],
+                'roomId': existing_room_id,
+                'playerCount': get_pvp_player_count(existing_room),
+                'playerNumber': existing_room['players'][sid]['player_number'],
                 'opponent': opponent
+            })
+            emit('pvp_room_status', {
+                'roomId': existing_room_id,
+                'playerCount': get_pvp_player_count(existing_room),
+                'battleActive': existing_room['battle_active']
             })
             return
 
-        # Get opponent BEFORE adding new player (to check if someone is already waiting)
+        room_id, room = get_or_create_open_room()
+        room_name = get_pvp_room_name(room_id)
+
+        # Capture existing opponent before adding player
         existing_opponent = None
         existing_opponent_sid = None
-        for player_sid, player_data in pvp_room['players'].items():
-            if player_sid != sid:
-                existing_opponent = {'sid': player_sid, **player_data}
-                existing_opponent_sid = player_sid
-                break
+        for player_sid, player_data in room['players'].items():
+            existing_opponent = {'sid': player_sid, **player_data}
+            existing_opponent_sid = player_sid
+            break
 
-        print(f"[PVP] Existing opponent before join: {existing_opponent}")
+        join_room(room_name)
+        pvp_sid_mapping[sid] = room_id
 
-        # Join the socket room
-        join_room(PVP_ROOM_NAME)
-        pvp_sid_mapping[sid] = True
-
-        # Determine player number (1 or 2)
-        player_number = len(pvp_room['player_order']) + 1
-
-        # Add player to arena
-        pvp_room['players'][sid] = {
+        player_number = len(room['player_order']) + 1
+        room['players'][sid] = {
             'username': username,
             'character': character,
             'bullets': bullets,
@@ -981,24 +1039,22 @@ def init_boss_battle_socket(socketio):
             'y': 300,
             'player_number': player_number
         }
-        pvp_room['player_order'].append(sid)
+        room['player_order'].append(sid)
 
-        # Get opponent again after adding (for the joining player's room state)
-        opponent = get_pvp_opponent(sid)
+        opponent = get_pvp_opponent(room, sid)
 
-        print(f"[PVP] Player {username} ({sid}) joined. Player number: {player_number}")
-        print(f"[PVP] Current players in room: {list(pvp_room['players'].keys())}")
-        print(f"[PVP] Opponent for new player: {opponent}")
-
-        # Send room state to joining player
         emit('pvp_room_state', {
-            'playerCount': get_pvp_player_count(),
+            'roomId': room_id,
+            'playerCount': get_pvp_player_count(room),
             'playerNumber': player_number,
             'opponent': opponent
         })
+        emit('pvp_room_status', {
+            'roomId': room_id,
+            'playerCount': get_pvp_player_count(room),
+            'battleActive': room['battle_active']
+        })
 
-        # Notify the existing opponent directly using their socket ID
-        # This is more reliable than room-based emit
         if existing_opponent and existing_opponent_sid:
             new_player_data = {
                 'username': username,
@@ -1007,225 +1063,821 @@ def init_boss_battle_socket(socketio):
                 'lives': lives,
                 'player_number': player_number
             }
-            print(f"[PVP] Notifying opponent {existing_opponent['username']} ({existing_opponent_sid}) about new player")
-
-            # Emit directly to the opponent's socket ID for reliability
             socketio.emit('pvp_opponent_joined', {
                 'opponent': new_player_data,
-                'playerCount': get_pvp_player_count()
+                'playerCount': get_pvp_player_count(room)
             }, to=existing_opponent_sid)
 
-            # Also send a full room state snapshot to the existing opponent
-            # to avoid clients getting stuck in "waiting" if they miss the join event.
             socketio.emit('pvp_room_state', {
-                'playerCount': get_pvp_player_count(),
+                'roomId': room_id,
+                'playerCount': get_pvp_player_count(room),
                 'playerNumber': existing_opponent.get('player_number', 1),
                 'opponent': new_player_data
             }, to=existing_opponent_sid)
 
-            # Also broadcast via room for redundancy
             socketio.emit('pvp_match_ready', {
                 'message': 'Both players are in the arena!',
-                'playerCount': 2,
-                'player1': pvp_room['players'].get(pvp_room['player_order'][0]) if len(pvp_room['player_order']) > 0 else None,
-                'player2': pvp_room['players'].get(pvp_room['player_order'][1]) if len(pvp_room['player_order']) > 1 else None
-            }, room=PVP_ROOM_NAME)
-            
-            print(f"[PVP] Match ready! Sent pvp_match_ready to room {PVP_ROOM_NAME}")
-            
-            # Auto-start battle when 2 players have joined (no need to wait for ready)
-            if get_pvp_player_count() >= 2 and not pvp_room['battle_active']:
-                pvp_room['battle_active'] = True
+                'playerCount': get_pvp_player_count(room),
+                'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
+                'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
+            }, room=room_name)
+
+            if get_pvp_player_count(room) >= 2 and not room['battle_active']:
+                room['battle_active'] = True
                 socketio.emit('pvp_battle_start', {
                     'message': 'Battle starting!',
-                    'player1': pvp_room['players'].get(pvp_room['player_order'][0]) if len(pvp_room['player_order']) > 0 else None,
-                    'player2': pvp_room['players'].get(pvp_room['player_order'][1]) if len(pvp_room['player_order']) > 1 else None
-                }, room=PVP_ROOM_NAME)
-                print(f"[PVP] Auto-started battle!")
+                    'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
+                    'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
+                }, room=room_name)
 
-        # Broadcast status update to all clients
         broadcast_pvp_status()
-
-        print(f"[PVP] Player {username} ({sid}) joined arena. Total players: {get_pvp_player_count()}")
 
     @socketio.on('pvp_ready')
     def handle_pvp_ready(data):
-        """Handle player ready status"""
         sid = request.sid
-
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
             return
-
-        pvp_room['ready_players'].add(sid)
-
-        # Check if both players are ready
-        if len(pvp_room['ready_players']) >= 2 and get_pvp_player_count() >= 2:
-            pvp_room['battle_active'] = True
-            emit('pvp_battle_start', {}, room=PVP_ROOM_NAME)
-            print(f"[PVP] Battle starting!")
+        room['ready_players'].add(sid)
+        if len(room['ready_players']) >= 2 and get_pvp_player_count(room) >= 2:
+            room['battle_active'] = True
+            emit('pvp_battle_start', {}, room=get_pvp_room_name(room_id))
 
     @socketio.on('pvp_move')
     def handle_pvp_move(data):
-        """Handle player position update"""
         sid = request.sid
-        x = data.get('x')
-        y = data.get('y')
-
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
+            return
+        desired_x = data.get('x')
+        desired_y = data.get('y')
+        if desired_x is None or desired_y is None:
             return
 
-        pvp_room['players'][sid]['x'] = x
-        pvp_room['players'][sid]['y'] = y
+        corrected = False
+        min_dist = PVP_PLAYER_RADIUS * 2
+        for other_sid, other in room['players'].items():
+            if other_sid == sid:
+                continue
+            desired_x, desired_y, did_correct = resolve_player_collision(
+                desired_x, desired_y, other.get('x', desired_x), other.get('y', desired_y), min_dist
+            )
+            corrected = corrected or did_correct
 
-        # Broadcast to opponent
+        room['players'][sid]['x'] = desired_x
+        room['players'][sid]['y'] = desired_y
         emit('pvp_opponent_position', {
-            'x': x,
-            'y': y
-        }, room=PVP_ROOM_NAME, include_self=False)
+            'x': desired_x,
+            'y': desired_y
+        }, room=get_pvp_room_name(room_id), include_self=False)
+
+        # Authoritative position for the mover (prevents overlap/jitter)
+        emit('pvp_self_position', {
+            'x': desired_x,
+            'y': desired_y
+        }, to=sid)
 
     @socketio.on('pvp_shoot')
     def handle_pvp_shoot(data):
-        """Handle player shooting"""
         sid = request.sid
-
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
             return
-
-        # Broadcast shot to opponent
         emit('pvp_opponent_shot', {
             'bulletX': data.get('bulletX'),
             'bulletY': data.get('bulletY'),
             'dx': data.get('dx'),
             'dy': data.get('dy'),
             'character': data.get('character')
-        }, room=PVP_ROOM_NAME, include_self=False)
+        }, room=get_pvp_room_name(room_id), include_self=False)
 
     @socketio.on('pvp_hit_opponent')
     def handle_pvp_hit_opponent(data):
-        """Handle player hitting opponent"""
         sid = request.sid
-
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
             return
-
-        # Find opponent
-        opponent = get_pvp_opponent(sid)
+        opponent = get_pvp_opponent(room, sid)
         if not opponent:
             return
-
         opponent_sid = opponent['sid']
-        if opponent_sid not in pvp_room['players']:
+        if opponent_sid not in room['players']:
             return
-
-        # Reduce opponent lives
-        pvp_room['players'][opponent_sid]['lives'] -= 1
-        new_lives = pvp_room['players'][opponent_sid]['lives']
-
-        # Broadcast hit to both players
+        room['players'][opponent_sid]['lives'] -= 1
+        new_lives = room['players'][opponent_sid]['lives']
         emit('pvp_player_hit', {
             'target': opponent_sid,
             'lives': new_lives
-        }, room=PVP_ROOM_NAME)
-
-        print(f"[PVP] Player hit! Opponent lives: {new_lives}")
-
-        # Check if opponent died
+        }, room=get_pvp_room_name(room_id))
         if new_lives <= 0:
-            # Battle over - attacker wins
-            pvp_room['battle_active'] = False
-            pvp_room['ready_players'].clear()
-            print(f"[PVP] Battle over! Player {pvp_room['players'][sid]['username']} wins!")
+            room['battle_active'] = False
+            room['ready_players'].clear()
 
     @socketio.on('pvp_stats_update')
     def handle_pvp_stats_update(data):
-        """Handle player stats update"""
         sid = request.sid
-
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
             return
-
         if data.get('bullets') is not None:
-            pvp_room['players'][sid]['bullets'] = data.get('bullets')
+            room['players'][sid]['bullets'] = data.get('bullets')
         if data.get('lives') is not None:
-            pvp_room['players'][sid]['lives'] = data.get('lives')
-
-        # Broadcast to opponent
+            room['players'][sid]['lives'] = data.get('lives')
         emit('pvp_opponent_stats', {
-            'bullets': pvp_room['players'][sid]['bullets'],
-            'lives': pvp_room['players'][sid]['lives']
-        }, room=PVP_ROOM_NAME, include_self=False)
+            'bullets': room['players'][sid]['bullets'],
+            'lives': room['players'][sid]['lives']
+        }, room=get_pvp_room_name(room_id), include_self=False)
 
     @socketio.on('pvp_chat_send')
     def handle_pvp_chat_send(data):
-        """Handle chat message in PVP arena"""
         sid = request.sid
-        content = data.get('content', '')
+        room_id, room = get_room_by_sid(sid)
+        if not room:
+            return
+        content = (data.get('content', '') or '')[:280]
         username = data.get('username', 'Anonymous')
         character = data.get('character', 'knight')
-
         if not content:
             return
-
-        # Sanitize content
-        content = content[:280]
-
         emit('pvp_chat_message', {
             'username': username,
             'character': character,
             'content': content
-        }, room=PVP_ROOM_NAME, include_self=False)
+        }, room=get_pvp_room_name(room_id), include_self=False)
 
     @socketio.on('pvp_player_away')
     def handle_pvp_player_away(data):
-        """Handle player switching away"""
+        sid = request.sid
+        room_id, room = get_room_by_sid(sid)
+        if not room:
+            return
         username = data.get('username', 'Unknown')
-        emit('pvp_player_away', {'username': username}, room=PVP_ROOM_NAME, include_self=False)
+        emit('pvp_player_away', {'username': username}, room=get_pvp_room_name(room_id), include_self=False)
 
     @socketio.on('pvp_player_returned')
     def handle_pvp_player_returned(data):
-        """Handle player returning"""
+        sid = request.sid
+        room_id, room = get_room_by_sid(sid)
+        if not room:
+            return
         username = data.get('username', 'Unknown')
-        emit('pvp_player_returned', {'username': username}, room=PVP_ROOM_NAME, include_self=False)
+        emit('pvp_player_returned', {'username': username}, room=get_pvp_room_name(room_id), include_self=False)
 
     @socketio.on('pvp_leave')
     def handle_pvp_leave(data):
-        """Handle player leaving PVP arena"""
         sid = request.sid
         cleanup_pvp_player(sid)
 
     def cleanup_pvp_player(sid):
-        """Clean up a player from PVP arena"""
-        if sid not in pvp_room['players']:
+        room_id, room = get_room_by_sid(sid)
+        if not room or sid not in room['players']:
             return
-
-        player = pvp_room['players'][sid]
-        username = player['username']
-
-        # Remove from room
-        del pvp_room['players'][sid]
-        if sid in pvp_room['player_order']:
-            pvp_room['player_order'].remove(sid)
-        pvp_room['ready_players'].discard(sid)
-
-        # Clean up mapping
+        username = room['players'][sid]['username']
+        del room['players'][sid]
+        if sid in room['player_order']:
+            room['player_order'].remove(sid)
+        room['ready_players'].discard(sid)
         if sid in pvp_sid_mapping:
             del pvp_sid_mapping[sid]
-
-        leave_room(PVP_ROOM_NAME)
-
-        player_count = get_pvp_player_count()
-
-        # Notify opponent
+        leave_room(get_pvp_room_name(room_id))
         emit('pvp_opponent_left', {
             'username': username
-        }, room=PVP_ROOM_NAME)
-
-        # Reset battle state if battle was active
-        if pvp_room['battle_active']:
-            pvp_room['battle_active'] = False
-            pvp_room['ready_players'].clear()
-
-        # Broadcast status update
+        }, room=get_pvp_room_name(room_id))
+        if room['battle_active']:
+            room['battle_active'] = False
+            room['ready_players'].clear()
+        if len(room['players']) == 0:
+            del pvp_rooms[room_id]
         broadcast_pvp_status()
 
-        print(f"[PVP] Player {username} ({sid}) left arena. Remaining: {player_count}")
+    # ==================== KING OF THE ZONE HANDLERS ====================
+    # Mode summary:
+    # - Server owns zone position/size, control detection, and scoring.
+    # - Clients send positions via koz_move; server broadcasts koz_state snapshots.
+    # - Match ends on TARGET_SCORE or TIME_LIMIT.
+    import time
+    import math
+    import random
+
+    KOZ_TARGET_SCORE = 180
+    KOZ_TIME_LIMIT = 240  # seconds
+    KOZ_SCORE_PER_SEC = 4
+    KOZ_CORE_BONUS_PER_SEC = 2
+    KOZ_SHRINK_INTERVAL = 7  # seconds
+    KOZ_SHRINK_STEP = 28
+    KOZ_MIN_RADIUS = 120
+    KOZ_ZONE_START_RADIUS = 520
+    KOZ_MAP_WIDTH = 2000
+    KOZ_MAP_HEIGHT = 1300
+    KOZ_CONTESTED_RELOCATE_SECONDS = 10
+    KOZ_DRIFT_SPEED = 26
+    KOZ_STORM_MAX_HP = 100
+    KOZ_STORM_DAMAGE = 8
+    KOZ_STORM_REGEN = 4
+    KOZ_STORM_FINAL_MULT = 1.6
+    KOZ_PULSE_INTERVAL = 12
+    KOZ_PULSE_PULL = 40
+    KOZ_RESPAWN_PENALTY = 12
+    KOZ_BASE_SPEED = 90  # pixels per second
+    KOZ_COMBAT_MAX_HP = 100
+    KOZ_BULLET_DAMAGE = 20
+    KOZ_KILL_SCORE = 15
+    KOZ_DEATH_PENALTY = 6
+
+    def clamp(val, minv, maxv):
+        return max(minv, min(maxv, val))
+
+    def pick_zone_center(radius):
+        pad = int(radius + 80)
+        return (
+            random.randint(pad, KOZ_MAP_WIDTH - pad),
+            random.randint(pad, KOZ_MAP_HEIGHT - pad)
+        )
+
+    def get_unique_display_name(room, base_name):
+        base = (base_name or 'Player').strip() or 'Player'
+        existing = set(room.get('score_labels', {}).values())
+        if base not in existing:
+            return base
+        idx = 2
+        while f"{base} {idx}" in existing:
+            idx += 1
+        return f"{base} {idx}"
+
+    def get_koz_room_name(room_id):
+        return f"{KOZ_ROOM_PREFIX}_{room_id}"
+
+    def create_koz_room():
+        global koz_room_counter
+        room_id = str(koz_room_counter)
+        koz_room_counter += 1
+        base_radius = KOZ_ZONE_START_RADIUS
+        zx, zy = pick_zone_center(base_radius)
+        tx, ty = pick_zone_center(base_radius)
+        zone = {
+            'x': zx,
+            'y': zy,
+            'radius': base_radius,
+            'base_radius': base_radius,
+            'core_radius': max(80, int(base_radius * 0.35)),
+            'target_x': tx,
+            'target_y': ty
+        }
+        koz_rooms[room_id] = {
+            'players': {},
+            'team_scores': {},
+            'score_labels': {},
+            'zone': zone,
+            'time_left': KOZ_TIME_LIMIT,
+            'last_tick': time.time(),
+            'last_shrink': time.time(),
+            'last_pulse': time.time(),
+            'contested_seconds': 0,
+            'controller': None,
+            'task_running': False,
+            'round': 1,
+            'shrink_step': KOZ_SHRINK_STEP,
+            'match_over': False,
+            'storm_level': 1,
+            'phase': 1,
+            'finale': False,
+            'drift_speed': KOZ_DRIFT_SPEED
+        }
+        return room_id
+
+    def get_or_create_open_koz_room():
+        for room_id, room in koz_rooms.items():
+            if len(room['players']) < KOZ_MAX_PLAYERS and not room['match_over']:
+                return room_id, room
+        room_id = create_koz_room()
+        return room_id, koz_rooms[room_id]
+
+    def get_koz_room_by_sid(sid):
+        room_id = koz_sid_mapping.get(sid)
+        if room_id and room_id in koz_rooms:
+            return room_id, koz_rooms[room_id]
+        return None, None
+
+    def randomize_zone(room, reset_radius=False):
+        radius = room['zone']['base_radius'] if reset_radius else room['zone']['radius']
+        zx, zy = pick_zone_center(radius)
+        tx, ty = pick_zone_center(radius)
+        room['zone']['x'] = zx
+        room['zone']['y'] = zy
+        room['zone']['radius'] = radius
+        room['zone']['core_radius'] = max(80, int(radius * 0.35))
+        room['zone']['target_x'] = tx
+        room['zone']['target_y'] = ty
+        room['contested_seconds'] = 0
+        room['round'] += 1
+        room['shrink_step'] = min(room['shrink_step'] + 4, 60)
+
+    def compute_control(room):
+        zone = room['zone']
+        inside_ids = []
+        core_ids = []
+        for sid, p in room['players'].items():
+            dx = p['x'] - zone['x']
+            dy = p['y'] - zone['y']
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= zone['radius']:
+                inside_ids.append(sid)
+                if dist <= zone.get('core_radius', zone['radius'] * 0.35):
+                    core_ids.append(sid)
+        if len(inside_ids) == 1:
+            return inside_ids[0], False, inside_ids, core_ids
+        if len(inside_ids) > 1:
+            return None, True, inside_ids, core_ids
+        return None, False, inside_ids, core_ids
+
+    def koz_tick_loop(room_id):
+        room = koz_rooms.get(room_id)
+        if not room:
+            return
+        room['task_running'] = True
+
+        while room_id in koz_rooms and len(koz_rooms[room_id]['players']) > 0:
+            room = koz_rooms[room_id]
+            if room['match_over']:
+                break
+
+            now = time.time()
+            dt = now - room['last_tick']
+            if dt < 1.0:
+                time.sleep(0.1)
+                continue
+            room['last_tick'] = now
+
+            # Time limit
+            room['time_left'] = max(0, room['time_left'] - 1)
+
+            # Phase scaling based on remaining radius
+            radius_ratio = room['zone']['radius'] / room['zone']['base_radius']
+            room['phase'] = max(1, min(5, int((1 - radius_ratio) * 5) + 1))
+            room['storm_level'] = room['phase']
+
+            # Zone drift toward target
+            dx = room['zone']['target_x'] - room['zone']['x']
+            dy = room['zone']['target_y'] - room['zone']['y']
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist <= room['drift_speed']:
+                room['zone']['x'] = room['zone']['target_x']
+                room['zone']['y'] = room['zone']['target_y']
+            elif dist > 0:
+                room['zone']['x'] += (dx / dist) * room['drift_speed']
+                room['zone']['y'] += (dy / dist) * room['drift_speed']
+
+            pad = room['zone']['radius'] + 40
+            room['zone']['x'] = clamp(room['zone']['x'], pad, KOZ_MAP_WIDTH - pad)
+            room['zone']['y'] = clamp(room['zone']['y'], pad, KOZ_MAP_HEIGHT - pad)
+
+            controller, contested, inside_ids, core_ids = compute_control(room)
+            if contested:
+                room['contested_seconds'] += 1
+            else:
+                room['contested_seconds'] = 0
+
+            # Award score
+            if controller and not contested:
+                room['team_scores'].setdefault(controller, 0)
+                room['team_scores'][controller] += KOZ_SCORE_PER_SEC
+                if controller in room['players']:
+                    room['players'][controller]['score'] += KOZ_SCORE_PER_SEC
+                if controller in core_ids:
+                    room['team_scores'][controller] += KOZ_CORE_BONUS_PER_SEC
+                    if controller in room['players']:
+                        room['players'][controller]['score'] += KOZ_CORE_BONUS_PER_SEC
+
+            # Handle control change
+            if controller != room['controller']:
+                room['controller'] = controller
+                socketio.emit('koz_control_changed', {
+                    'controller': controller,
+                    'controllerName': room['score_labels'].get(controller),
+                    'contested': contested
+                }, room=get_koz_room_name(room_id))
+
+            # Storm damage and self-state updates
+            storm_mult = KOZ_STORM_FINAL_MULT if room['finale'] else 1.0
+            storm_damage = KOZ_STORM_DAMAGE * storm_mult
+            for sid, p in list(room['players'].items()):
+                dxp = p['x'] - room['zone']['x']
+                dyp = p['y'] - room['zone']['y']
+                distp = math.sqrt(dxp * dxp + dyp * dyp)
+                outside = distp > room['zone']['radius']
+                if outside:
+                    p['zone_hp'] = max(0, p.get('zone_hp', KOZ_STORM_MAX_HP) - storm_damage)
+                else:
+                    p['zone_hp'] = min(KOZ_STORM_MAX_HP, p.get('zone_hp', KOZ_STORM_MAX_HP) + KOZ_STORM_REGEN)
+
+                speed_mult = 1.0 if not outside else 0.85
+                if p['zone_hp'] < 40:
+                    speed_mult = min(speed_mult, 0.75)
+                p['speed_multiplier'] = speed_mult
+
+                if p['zone_hp'] <= 0:
+                    player_id = sid
+                    room['team_scores'][player_id] = max(0, room['team_scores'].get(player_id, 0) - KOZ_RESPAWN_PENALTY)
+                    p['score'] = max(0, p.get('score', 0) - KOZ_RESPAWN_PENALTY)
+                    p['zone_hp'] = int(KOZ_STORM_MAX_HP * 0.6)
+                    angle = random.random() * math.pi * 2
+                    spawn_r = max(room['zone']['radius'] * 0.85, KOZ_MIN_RADIUS * 0.9)
+                    p['x'] = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
+                    p['y'] = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
+                    socketio.emit('koz_player_down', {
+                        'username': p['username'],
+                        'sid': player_id
+                    }, room=get_koz_room_name(room_id))
+                    socketio.emit('koz_player_position', {
+                        'sid': sid,
+                        'x': p['x'],
+                        'y': p['y'],
+                        'character': p['character'],
+                        'username': p['username'],
+                        'hp': p.get('combat_hp', KOZ_COMBAT_MAX_HP)
+                    }, room=get_koz_room_name(room_id), include_self=False)
+                    socketio.emit('koz_self_position', {
+                        'x': p['x'],
+                        'y': p['y']
+                    }, to=sid)
+
+                socketio.emit('koz_self_state', {
+                    'zoneHp': p.get('zone_hp', KOZ_STORM_MAX_HP),
+                    'outside': outside,
+                    'speedMultiplier': p.get('speed_multiplier', 1.0),
+                    'combatHp': p.get('combat_hp', KOZ_COMBAT_MAX_HP),
+                    'storm': {
+                        'level': room['storm_level'],
+                        'damage': storm_damage,
+                        'regen': KOZ_STORM_REGEN
+                    },
+                    'phase': room['phase']
+                }, to=sid)
+
+            # Storm pulse (environmental pressure)
+            if now - room['last_pulse'] >= KOZ_PULSE_INTERVAL:
+                room['last_pulse'] = now
+                for sid, p in room['players'].items():
+                    dxp = room['zone']['x'] - p['x']
+                    dyp = room['zone']['y'] - p['y']
+                    distp = math.sqrt(dxp * dxp + dyp * dyp)
+                    if distp > 1:
+                        pull = KOZ_PULSE_PULL if distp > room['zone']['radius'] else KOZ_PULSE_PULL * 0.5
+                        p['x'] = clamp(p['x'] + (dxp / distp) * pull, 30, KOZ_MAP_WIDTH - 30)
+                        p['y'] = clamp(p['y'] + (dyp / distp) * pull, 30, KOZ_MAP_HEIGHT - 30)
+                        socketio.emit('koz_player_position', {
+                            'sid': sid,
+                            'x': p['x'],
+                            'y': p['y'],
+                            'character': p['character'],
+                            'username': p['username'],
+                            'hp': p.get('combat_hp', KOZ_COMBAT_MAX_HP)
+                        }, room=get_koz_room_name(room_id), include_self=False)
+                        socketio.emit('koz_self_position', {
+                            'x': p['x'],
+                            'y': p['y']
+                        }, to=sid)
+                socketio.emit('koz_zone_event', {
+                    'type': 'pulse'
+                }, room=get_koz_room_name(room_id))
+
+            # Shrink zone
+            if now - room['last_shrink'] >= KOZ_SHRINK_INTERVAL:
+                room['last_shrink'] = now
+                room['zone']['radius'] = max(KOZ_MIN_RADIUS, room['zone']['radius'] - room['shrink_step'])
+                room['zone']['core_radius'] = max(80, int(room['zone']['radius'] * 0.35))
+                tx, ty = pick_zone_center(room['zone']['radius'])
+                room['zone']['target_x'] = tx
+                room['zone']['target_y'] = ty
+                socketio.emit('koz_zone_event', {
+                    'type': 'shrink',
+                    'zone': room['zone'],
+                    'phase': room['phase'],
+                    'radius': room['zone']['radius']
+                }, room=get_koz_room_name(room_id))
+
+                if room['zone']['radius'] <= KOZ_MIN_RADIUS and not room['finale']:
+                    room['finale'] = True
+                    room['shrink_step'] = max(room['shrink_step'], 40)
+                    socketio.emit('koz_zone_event', {
+                        'type': 'finale',
+                        'zone': room['zone']
+                    }, room=get_koz_room_name(room_id))
+
+            # Relocate if contested too long
+            if room['contested_seconds'] >= KOZ_CONTESTED_RELOCATE_SECONDS:
+                randomize_zone(room, reset_radius=False)
+                socketio.emit('koz_zone_event', {
+                    'type': 'contested_relocate',
+                    'zone': room['zone'],
+                    'round': room['round']
+                }, room=get_koz_room_name(room_id))
+
+            if room['time_left'] <= 30 and not room['finale']:
+                room['finale'] = True
+                room['shrink_step'] = max(room['shrink_step'], 40)
+                socketio.emit('koz_zone_event', {
+                    'type': 'finale',
+                    'zone': room['zone']
+                }, room=get_koz_room_name(room_id))
+
+            # Match end conditions
+            winner_id = None
+            for pid, score in room['team_scores'].items():
+                if score >= KOZ_TARGET_SCORE:
+                    winner_id = pid
+                    break
+            if room['time_left'] <= 0 or winner_id:
+                room['match_over'] = True
+                # Determine winner by score if time expired
+                if not winner_id:
+                    winner_id = max(room['team_scores'].items(), key=lambda x: x[1])[0] if room['team_scores'] else None
+                socketio.emit('koz_match_end', {
+                    'winner': winner_id,
+                    'winnerName': room['score_labels'].get(winner_id),
+                    'teamScores': room['team_scores'],
+                    'timeLeft': room['time_left']
+                }, room=get_koz_room_name(room_id))
+                break
+
+            # Broadcast state snapshot
+            socketio.emit('koz_state', {
+                'zone': room['zone'],
+                'controller': room['controller'],
+                'controllerName': room['score_labels'].get(room['controller']),
+                'contested': contested,
+                'teamScores': room['team_scores'],
+                'scoreLabels': room['score_labels'],
+                'timeLeft': room['time_left'],
+                'round': room['round'],
+                'phase': room['phase'],
+                'storm': {
+                    'level': room['storm_level'],
+                    'damage': KOZ_STORM_DAMAGE * (KOZ_STORM_FINAL_MULT if room['finale'] else 1.0),
+                    'regen': KOZ_STORM_REGEN
+                }
+            }, room=get_koz_room_name(room_id))
+
+        room = koz_rooms.get(room_id)
+        if room:
+            room['task_running'] = False
+
+    def get_koz_aggregate_status():
+        total_players = sum(len(room['players']) for room in koz_rooms.values())
+        active_rooms = len([room for room in koz_rooms.values() if room['players']])
+        open_slots = sum(KOZ_MAX_PLAYERS - len(room['players']) for room in koz_rooms.values())
+        if open_slots == 0:
+            open_slots = KOZ_MAX_PLAYERS
+        return {
+            'totalPlayers': total_players,
+            'activeRooms': active_rooms,
+            'openSlots': open_slots
+        }
+
+    @socketio.on('koz_get_status')
+    def handle_koz_get_status(data):
+        emit('koz_status', get_koz_aggregate_status())
+
+    @socketio.on('koz_join')
+    def handle_koz_join(data):
+        sid = request.sid
+        username = data.get('username', 'Guest')
+        character = data.get('character', 'knight')
+
+        existing_room_id, existing_room = get_koz_room_by_sid(sid)
+        if existing_room:
+            existing_room.setdefault('score_labels', {})
+            for pid, pdata in existing_room['players'].items():
+                existing_room['score_labels'].setdefault(pid, pdata.get('username', 'Player'))
+                if 'combat_hp' not in pdata:
+                    pdata['combat_hp'] = KOZ_COMBAT_MAX_HP
+            emit('koz_room_state', {
+                'roomId': existing_room_id,
+                'zone': existing_room['zone'],
+                'teamScores': existing_room['team_scores'],
+                'scoreLabels': existing_room.get('score_labels', {}),
+                'timeLeft': existing_room['time_left'],
+                'round': existing_room['round'],
+                'phase': existing_room.get('phase', 1),
+                'storm': {
+                    'level': existing_room.get('storm_level', 1),
+                    'damage': KOZ_STORM_DAMAGE,
+                    'regen': KOZ_STORM_REGEN
+                },
+                'selfId': sid,
+                'map': {
+                    'width': KOZ_MAP_WIDTH,
+                    'height': KOZ_MAP_HEIGHT
+                },
+                'rules': {
+                    'targetScore': KOZ_TARGET_SCORE,
+                    'timeLimit': KOZ_TIME_LIMIT,
+                    'scorePerSec': KOZ_SCORE_PER_SEC,
+                    'coreBonus': KOZ_CORE_BONUS_PER_SEC,
+                    'stormMax': KOZ_STORM_MAX_HP
+                }
+            })
+            return
+
+        room_id, room = get_or_create_open_koz_room()
+        room_name = get_koz_room_name(room_id)
+        join_room(room_name)
+        koz_sid_mapping[sid] = room_id
+        display_name = get_unique_display_name(room, username)
+
+        angle = random.random() * math.pi * 2
+        spawn_r = room['zone']['radius'] * 0.6
+        spawn_x = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
+        spawn_y = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
+        room['players'][sid] = {
+            'username': display_name,
+            'character': character,
+            'score': 0,
+            'x': data.get('x', spawn_x),
+            'y': data.get('y', spawn_y),
+            'zone_hp': KOZ_STORM_MAX_HP,
+            'combat_hp': KOZ_COMBAT_MAX_HP,
+            'last_move': time.time(),
+            'speed_multiplier': 1.0
+        }
+        room['team_scores'].setdefault(sid, 0)
+        room['score_labels'][sid] = display_name
+
+        emit('koz_room_state', {
+            'roomId': room_id,
+            'zone': room['zone'],
+            'teamScores': room['team_scores'],
+            'scoreLabels': room['score_labels'],
+            'timeLeft': room['time_left'],
+            'round': room['round'],
+            'phase': room.get('phase', 1),
+            'storm': {
+                'level': room.get('storm_level', 1),
+                'damage': KOZ_STORM_DAMAGE,
+                'regen': KOZ_STORM_REGEN
+            },
+            'selfId': sid,
+            'map': {
+                'width': KOZ_MAP_WIDTH,
+                'height': KOZ_MAP_HEIGHT
+            },
+            'rules': {
+                'targetScore': KOZ_TARGET_SCORE,
+                'timeLimit': KOZ_TIME_LIMIT,
+                'scorePerSec': KOZ_SCORE_PER_SEC,
+                'coreBonus': KOZ_CORE_BONUS_PER_SEC,
+                'stormMax': KOZ_STORM_MAX_HP
+            }
+        })
+
+        socketio.emit('koz_player_joined', {
+            'sid': sid,
+            'username': display_name
+        }, room=room_name, include_self=False)
+
+        if not room['task_running']:
+            socketio.start_background_task(koz_tick_loop, room_id)
+
+        emit('koz_status', get_koz_aggregate_status())
+
+    @socketio.on('koz_move')
+    def handle_koz_move(data):
+        sid = request.sid
+        room_id, room = get_koz_room_by_sid(sid)
+        if not room or sid not in room['players']:
+            return
+        player = room['players'][sid]
+        desired_x = data.get('x', player['x'])
+        desired_y = data.get('y', player['y'])
+
+        now = time.time()
+        last_move = player.get('last_move', now)
+        dt = max(0.02, min(0.2, now - last_move))
+        player['last_move'] = now
+        max_step = KOZ_BASE_SPEED * dt * player.get('speed_multiplier', 1.0)
+        dx = desired_x - player['x']
+        dy = desired_y - player['y']
+        dist = math.sqrt(dx * dx + dy * dy)
+        if dist > max_step and dist > 0:
+            desired_x = player['x'] + (dx / dist) * max_step
+            desired_y = player['y'] + (dy / dist) * max_step
+
+        margin = KOZ_PLAYER_RADIUS
+        desired_x = clamp(desired_x, margin, KOZ_MAP_WIDTH - margin)
+        desired_y = clamp(desired_y, margin, KOZ_MAP_HEIGHT - margin)
+
+        corrected = False
+        min_dist = KOZ_PLAYER_RADIUS * 2
+        for other_sid, other in room['players'].items():
+            if other_sid == sid:
+                continue
+            desired_x, desired_y, did_correct = resolve_player_collision(
+                desired_x, desired_y, other.get('x', desired_x), other.get('y', desired_y), min_dist
+            )
+            corrected = corrected or did_correct
+
+        desired_x = clamp(desired_x, margin, KOZ_MAP_WIDTH - margin)
+        desired_y = clamp(desired_y, margin, KOZ_MAP_HEIGHT - margin)
+        room['players'][sid]['x'] = desired_x
+        room['players'][sid]['y'] = desired_y
+        emit('koz_player_position', {
+            'sid': sid,
+            'x': desired_x,
+            'y': desired_y,
+            'character': room['players'][sid]['character'],
+            'username': room['players'][sid]['username'],
+            'hp': room['players'][sid].get('combat_hp', KOZ_COMBAT_MAX_HP)
+        }, room=get_koz_room_name(room_id), include_self=False)
+
+        emit('koz_self_position', {
+            'x': desired_x,
+            'y': desired_y
+        }, to=sid)
+
+    @socketio.on('koz_shoot')
+    def handle_koz_shoot(data):
+        sid = request.sid
+        room_id, room = get_koz_room_by_sid(sid)
+        if not room or sid not in room['players']:
+            return
+        emit('koz_bullet', {
+            'bulletX': data.get('bulletX'),
+            'bulletY': data.get('bulletY'),
+            'dx': data.get('dx'),
+            'dy': data.get('dy'),
+            'character': room['players'][sid]['character'],
+            'shooter': sid,
+            'target': data.get('target')
+        }, room=get_koz_room_name(room_id), include_self=False)
+
+    @socketio.on('koz_hit_player')
+    def handle_koz_hit_player(data):
+        sid = request.sid
+        room_id, room = get_koz_room_by_sid(sid)
+        if not room or sid not in room['players']:
+            return
+        target_sid = data.get('target')
+        if not target_sid or target_sid not in room['players'] or target_sid == sid:
+            return
+        damage = int(data.get('damage', KOZ_BULLET_DAMAGE))
+        target = room['players'][target_sid]
+        target['combat_hp'] = max(0, target.get('combat_hp', KOZ_COMBAT_MAX_HP) - damage)
+
+        down = target['combat_hp'] <= 0
+        if down:
+            target['combat_hp'] = KOZ_COMBAT_MAX_HP
+            # Award points to shooter and apply penalty to target
+            room['team_scores'].setdefault(sid, 0)
+            room['team_scores'][sid] += KOZ_KILL_SCORE
+            room['team_scores'][target_sid] = max(0, room['team_scores'].get(target_sid, 0) - KOZ_DEATH_PENALTY)
+
+            angle = random.random() * math.pi * 2
+            spawn_r = max(room['zone']['radius'] * 0.8, KOZ_MIN_RADIUS * 0.9)
+            target['x'] = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
+            target['y'] = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
+
+            socketio.emit('koz_player_position', {
+                'sid': target_sid,
+                'x': target['x'],
+                'y': target['y'],
+                'character': target['character'],
+                'username': target['username'],
+                'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP)
+            }, room=get_koz_room_name(room_id), include_self=False)
+            socketio.emit('koz_self_position', {
+                'x': target['x'],
+                'y': target['y']
+            }, to=target_sid)
+
+        socketio.emit('koz_player_hit', {
+            'target': target_sid,
+            'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP),
+            'down': down,
+            'targetName': target['username'],
+            'killer': sid,
+            'killerName': room['players'][sid]['username']
+        }, room=get_koz_room_name(room_id))
+
+    @socketio.on('koz_leave')
+    def handle_koz_leave(data):
+        cleanup_koz_player(request.sid)
+
+    def cleanup_koz_player(sid):
+        room_id, room = get_koz_room_by_sid(sid)
+        if not room or sid not in room['players']:
+            return
+        username = room['players'][sid]['username']
+        del room['players'][sid]
+        if sid in room['team_scores']:
+            del room['team_scores'][sid]
+        if sid in room['score_labels']:
+            del room['score_labels'][sid]
+        if room.get('controller') == sid:
+            room['controller'] = None
+        if sid in koz_sid_mapping:
+            del koz_sid_mapping[sid]
+        leave_room(get_koz_room_name(room_id))
+        emit('koz_player_left', {'username': username, 'sid': sid}, room=get_koz_room_name(room_id))
+        if len(room['players']) == 0:
+            del koz_rooms[room_id]
+        emit('koz_status', get_koz_aggregate_status())

@@ -1386,48 +1386,118 @@ def init_boss_battle_socket(socketio):
         broadcast_pvp_status()
 
     # ==================== KING OF THE ZONE HANDLERS ====================
-    # Mode summary:
-    # - Server owns zone position/size, control detection, and scoring.
-    # - Clients send positions via koz_move; server broadcasts koz_state snapshots.
-    # - Match ends on TARGET_SCORE or TIME_LIMIT.
+    # Server-authoritative mode:
+    # - Zone center/radius, shrink cadence, projectiles, obstacle collision and powerups are owned by server.
+    # - Clients send intent (move + shoot aim), server validates and broadcasts deltas.
     import time
-    import math
-    import random
 
-    KOZ_TARGET_SCORE = 180
-    KOZ_TIME_LIMIT = 240  # seconds
+    KOZ_TARGET_SCORE = 220
+    KOZ_TIME_LIMIT = 300  # seconds
     KOZ_SCORE_PER_SEC = 4
-    KOZ_CORE_BONUS_PER_SEC = 2
-    KOZ_SHRINK_INTERVAL = 7  # seconds
-    KOZ_SHRINK_STEP = 28
-    KOZ_MIN_RADIUS = 120
-    KOZ_ZONE_START_RADIUS = 520
-    KOZ_MAP_WIDTH = 2000
-    KOZ_MAP_HEIGHT = 1300
-    KOZ_CONTESTED_RELOCATE_SECONDS = 10
-    KOZ_DRIFT_SPEED = 26
+    KOZ_CORE_BONUS_PER_SEC = 3
+    KOZ_SHRINK_INTERVAL = 16  # seconds between shrink phases
+    KOZ_SHRINK_DURATION = 6   # seconds to animate each shrink
+    KOZ_SHRINK_STEP = 220
+    KOZ_MIN_RADIUS = 760
+    KOZ_ZONE_START_RADIUS = 3400
+    KOZ_MAP_WIDTH = 9800
+    KOZ_MAP_HEIGHT = 7600
+    KOZ_CONTESTED_RELOCATE_SECONDS = 18
+    KOZ_DRIFT_SPEED = 22
     KOZ_STORM_MAX_HP = 100
-    KOZ_STORM_DAMAGE = 8
-    KOZ_STORM_REGEN = 4
-    KOZ_STORM_FINAL_MULT = 1.6
-    KOZ_PULSE_INTERVAL = 12
-    KOZ_PULSE_PULL = 40
+    KOZ_STORM_DAMAGE = 9
+    KOZ_STORM_REGEN = 5
+    KOZ_STORM_FINAL_MULT = 1.7
+    KOZ_PULSE_INTERVAL = 14
+    KOZ_PULSE_PULL = 52
     KOZ_RESPAWN_PENALTY = 12
-    KOZ_BASE_SPEED = 90  # pixels per second
+    KOZ_BASE_SPEED = 150  # pixels per second
     KOZ_COMBAT_MAX_HP = 100
-    KOZ_BULLET_DAMAGE = 20
-    KOZ_KILL_SCORE = 15
-    KOZ_DEATH_PENALTY = 6
+    KOZ_KILL_SCORE = 16
+    KOZ_DEATH_PENALTY = 8
+    KOZ_TICK_RATE = 0.05  # 20Hz
+    KOZ_SCORE_TICK = 1.0
+    KOZ_STATE_BROADCAST_INTERVAL = 0.2
+    KOZ_POWERUP_MAX = 10
+    KOZ_POWERUP_RESPAWN_DELAY = 4
+    KOZ_POWERUP_RADIUS = 18
+    KOZ_OBSTACLE_COUNT = 26
+    KOZ_OBSTACLE_MIN_RADIUS = 44
+    KOZ_OBSTACLE_MAX_RADIUS = 95
+
+    KOZ_HERO_DEFAULT_WEAPON = {
+        'knight': 'bulwark-disc',
+        'wizard': 'arcane-orb',
+        'archer': 'piercing-arrow',
+        'warrior': 'rage-axe'
+    }
+
+    KOZ_WEAPON_CONFIG = {
+        'bulwark-disc': {
+            'speed': 980.0,
+            'radius': 10,
+            'damage': 18,
+            'lifetime': 1.8,
+            'cooldown': 0.46,
+            'spread': [0.0],
+            'pierce': 0,
+            'bounces': 1,
+            'splash': 0,
+            'color': '#8ed7ff'
+        },
+        'arcane-orb': {
+            'speed': 840.0,
+            'radius': 11,
+            'damage': 20,
+            'lifetime': 1.65,
+            'cooldown': 0.58,
+            'spread': [-0.08, 0.08],
+            'pierce': 0,
+            'bounces': 0,
+            'splash': 74,
+            'color': '#ff9f5a'
+        },
+        'piercing-arrow': {
+            'speed': 1220.0,
+            'radius': 7,
+            'damage': 16,
+            'lifetime': 1.9,
+            'cooldown': 0.34,
+            'spread': [0.0],
+            'pierce': 1,
+            'bounces': 0,
+            'splash': 0,
+            'color': '#8ef7cc'
+        },
+        'rage-axe': {
+            'speed': 900.0,
+            'radius': 12,
+            'damage': 24,
+            'lifetime': 1.6,
+            'cooldown': 0.62,
+            'spread': [0.0],
+            'pierce': 0,
+            'bounces': 0,
+            'splash': 34,
+            'color': '#ffc46b'
+        }
+    }
+
+    KOZ_POWERUP_CONFIG = {
+        'speed-boost': {'label': 'Speed Boost', 'duration': 7.0},
+        'shield': {'label': 'Shield', 'amount': 35},
+        'rapid-fire': {'label': 'Rapid Fire', 'duration': 6.0},
+        'heal': {'label': 'Heal', 'amount': 30},
+        'vision-ping': {'label': 'Vision Ping', 'duration': 3.5},
+        'ammo-pack': {'label': 'Ammo Pack', 'amount': 12}
+    }
 
     def clamp(val, minv, maxv):
         return max(minv, min(maxv, val))
 
     def pick_zone_center(radius):
-        pad = int(radius + 80)
-        return (
-            random.randint(pad, KOZ_MAP_WIDTH - pad),
-            random.randint(pad, KOZ_MAP_HEIGHT - pad)
-        )
+        # KOZ ring center is stable in world space so the arena feels massive.
+        return (KOZ_MAP_WIDTH / 2.0, KOZ_MAP_HEIGHT / 2.0)
 
     def get_unique_display_name(room, base_name):
         base = (base_name or 'Player').strip() or 'Player'
@@ -1442,31 +1512,201 @@ def init_boss_battle_socket(socketio):
     def get_koz_room_name(room_id):
         return f"{KOZ_ROOM_PREFIX}_{room_id}"
 
+    def resolve_weapon_type(character, explicit):
+        maybe = str(explicit or '').strip().lower()
+        if maybe in KOZ_WEAPON_CONFIG:
+            return maybe
+        hero = str(character or 'knight').strip().lower()
+        return KOZ_HERO_DEFAULT_WEAPON.get(hero, 'bulwark-disc')
+
+    def get_weapon_cfg(player):
+        return KOZ_WEAPON_CONFIG.get(player.get('weapon_type'), KOZ_WEAPON_CONFIG['bulwark-disc'])
+
+    def circle_hits_obstacle(x, y, radius, obstacle):
+        dx = x - obstacle['x']
+        dy = y - obstacle['y']
+        r = radius + obstacle['radius']
+        return (dx * dx + dy * dy) <= (r * r)
+
+    def resolve_circle_obstacle(x, y, radius, obstacle):
+        dx = x - obstacle['x']
+        dy = y - obstacle['y']
+        dist = math.sqrt(dx * dx + dy * dy)
+        min_dist = radius + obstacle['radius']
+        if dist < 0.001:
+            return obstacle['x'] + min_dist, y, True
+        if dist >= min_dist:
+            return x, y, False
+        overlap = min_dist - dist
+        nx = dx / dist
+        ny = dy / dist
+        return x + nx * overlap, y + ny * overlap, True
+
+    def is_spawn_clear(room, x, y, radius):
+        for obstacle in room.get('obstacles', {}).values():
+            if circle_hits_obstacle(x, y, radius, obstacle):
+                return False
+        for other in room.get('players', {}).values():
+            ox = other.get('x', x)
+            oy = other.get('y', y)
+            if math.hypot(x - ox, y - oy) < (radius + KOZ_PLAYER_RADIUS + 20):
+                return False
+        return True
+
+    def find_spawn_point(room, prefer_zone_ring=False):
+        zone = room['zone']
+        for _ in range(90):
+            if prefer_zone_ring:
+                angle = random.random() * math.pi * 2
+                radius = random.uniform(max(KOZ_MIN_RADIUS * 0.85, zone['radius'] * 0.72), zone['radius'] * 1.02)
+                x = zone['x'] + math.cos(angle) * radius
+                y = zone['y'] + math.sin(angle) * radius
+            else:
+                x = random.uniform(KOZ_PLAYER_RADIUS + 30, KOZ_MAP_WIDTH - KOZ_PLAYER_RADIUS - 30)
+                y = random.uniform(KOZ_PLAYER_RADIUS + 30, KOZ_MAP_HEIGHT - KOZ_PLAYER_RADIUS - 30)
+            x = clamp(x, KOZ_PLAYER_RADIUS + 5, KOZ_MAP_WIDTH - KOZ_PLAYER_RADIUS - 5)
+            y = clamp(y, KOZ_PLAYER_RADIUS + 5, KOZ_MAP_HEIGHT - KOZ_PLAYER_RADIUS - 5)
+            if is_spawn_clear(room, x, y, KOZ_PLAYER_RADIUS):
+                return x, y
+        return (
+            clamp(zone['x'], KOZ_PLAYER_RADIUS + 5, KOZ_MAP_WIDTH - KOZ_PLAYER_RADIUS - 5),
+            clamp(zone['y'], KOZ_PLAYER_RADIUS + 5, KOZ_MAP_HEIGHT - KOZ_PLAYER_RADIUS - 5)
+        )
+
+    def serialize_obstacles(room):
+        return [
+            {
+                'id': obs['id'],
+                'x': obs['x'],
+                'y': obs['y'],
+                'radius': obs['radius'],
+                'type': obs['type'],
+                'destructible': bool(obs.get('destructible')),
+                'hp': obs.get('hp', 0)
+            }
+            for obs in room.get('obstacles', {}).values()
+        ]
+
+    def serialize_powerups(room):
+        return [
+            {
+                'id': p['id'],
+                'type': p['type'],
+                'x': p['x'],
+                'y': p['y'],
+                'radius': p.get('radius', KOZ_POWERUP_RADIUS),
+                'spawnedAt': p.get('spawned_at', time.time())
+            }
+            for p in room.get('powerups', {}).values()
+        ]
+
+    def serialize_players(room):
+        payload = []
+        for sid, player in room.get('players', {}).items():
+            payload.append({
+                'sid': sid,
+                'x': player.get('x', 0),
+                'y': player.get('y', 0),
+                'character': player.get('character', 'knight'),
+                'weapon_type': player.get('weapon_type'),
+                'username': player.get('username', 'Player'),
+                'hp': player.get('combat_hp', KOZ_COMBAT_MAX_HP)
+            })
+        return payload
+
+    def get_next_shrink_seconds(room, now):
+        shrink = room['shrink']
+        if shrink.get('active'):
+            return 0
+        return max(0.0, shrink.get('next_at', now) - now)
+
+    def spawn_powerup(room, forced_type=None):
+        if len(room['powerups']) >= KOZ_POWERUP_MAX:
+            return None
+        available_types = list(KOZ_POWERUP_CONFIG.keys())
+        ptype = forced_type if forced_type in KOZ_POWERUP_CONFIG else random.choice(available_types)
+
+        for _ in range(120):
+            x = random.uniform(KOZ_POWERUP_RADIUS + 20, KOZ_MAP_WIDTH - KOZ_POWERUP_RADIUS - 20)
+            y = random.uniform(KOZ_POWERUP_RADIUS + 20, KOZ_MAP_HEIGHT - KOZ_POWERUP_RADIUS - 20)
+            if not is_spawn_clear(room, x, y, KOZ_POWERUP_RADIUS):
+                continue
+            room['powerup_seq'] += 1
+            powerup = {
+                'id': f"pow_{room['powerup_seq']}",
+                'type': ptype,
+                'x': x,
+                'y': y,
+                'radius': KOZ_POWERUP_RADIUS,
+                'spawned_at': time.time()
+            }
+            room['powerups'][powerup['id']] = powerup
+            return powerup
+        return None
+
+    def spawn_initial_powerups(room):
+        initial = min(6, KOZ_POWERUP_MAX)
+        for _ in range(initial):
+            spawn_powerup(room)
+
+    def generate_koz_obstacles(zone):
+        obstacles = {}
+        obstacle_types = ['rock', 'crate', 'pillar', 'wall']
+        seq = 0
+        attempts = 0
+        while len(obstacles) < KOZ_OBSTACLE_COUNT and attempts < KOZ_OBSTACLE_COUNT * 60:
+            attempts += 1
+            radius = random.randint(KOZ_OBSTACLE_MIN_RADIUS, KOZ_OBSTACLE_MAX_RADIUS)
+            x = random.uniform(radius + 60, KOZ_MAP_WIDTH - radius - 60)
+            y = random.uniform(radius + 60, KOZ_MAP_HEIGHT - radius - 60)
+            # Keep central zone readable.
+            if math.hypot(x - zone['x'], y - zone['y']) < zone['radius'] * 0.26:
+                continue
+            blocked = False
+            for obs in obstacles.values():
+                if math.hypot(x - obs['x'], y - obs['y']) < (radius + obs['radius'] + 50):
+                    blocked = True
+                    break
+            if blocked:
+                continue
+            seq += 1
+            destructible = (seq % 4 == 0)
+            obstacles[f"obs_{seq}"] = {
+                'id': f"obs_{seq}",
+                'x': x,
+                'y': y,
+                'radius': radius,
+                'type': random.choice(obstacle_types),
+                'destructible': destructible,
+                'hp': 2 if destructible else 9999
+            }
+        return obstacles
+
     def create_koz_room():
         global koz_room_counter
         room_id = str(koz_room_counter)
         koz_room_counter += 1
+        now = time.time()
         base_radius = KOZ_ZONE_START_RADIUS
         zx, zy = pick_zone_center(base_radius)
         tx, ty = pick_zone_center(base_radius)
         zone = {
             'x': zx,
             'y': zy,
-            'radius': base_radius,
-            'base_radius': base_radius,
-            'core_radius': max(80, int(base_radius * 0.35)),
+            'radius': float(base_radius),
+            'base_radius': float(base_radius),
+            'core_radius': max(220, int(base_radius * 0.35)),
             'target_x': tx,
             'target_y': ty
         }
-        koz_rooms[room_id] = {
+        room = {
             'players': {},
             'team_scores': {},
             'score_labels': {},
             'zone': zone,
             'time_left': KOZ_TIME_LIMIT,
-            'last_tick': time.time(),
-            'last_shrink': time.time(),
-            'last_pulse': time.time(),
+            'last_tick': now,
+            'last_pulse': now,
             'contested_seconds': 0,
             'controller': None,
             'task_running': False,
@@ -1476,8 +1716,26 @@ def init_boss_battle_socket(socketio):
             'storm_level': 1,
             'phase': 1,
             'finale': False,
-            'drift_speed': KOZ_DRIFT_SPEED
+            'drift_speed': KOZ_DRIFT_SPEED,
+            'score_accumulator': 0.0,
+            'last_state_broadcast': 0.0,
+            'projectiles': {},
+            'projectile_seq': 0,
+            'powerups': {},
+            'powerup_seq': 0,
+            'next_powerup_at': now + 2.0,
+            'shrink': {
+                'active': False,
+                'from_radius': float(base_radius),
+                'to_radius': float(base_radius),
+                'start_at': now,
+                'end_at': now,
+                'next_at': now + KOZ_SHRINK_INTERVAL
+            }
         }
+        room['obstacles'] = generate_koz_obstacles(zone)
+        spawn_initial_powerups(room)
+        koz_rooms[room_id] = room
         return room_id
 
     def get_or_create_open_koz_room():
@@ -1499,13 +1757,16 @@ def init_boss_battle_socket(socketio):
         tx, ty = pick_zone_center(radius)
         room['zone']['x'] = zx
         room['zone']['y'] = zy
-        room['zone']['radius'] = radius
-        room['zone']['core_radius'] = max(80, int(radius * 0.35))
+        room['zone']['radius'] = float(radius)
+        room['zone']['core_radius'] = max(220, int(radius * 0.35))
         room['zone']['target_x'] = tx
         room['zone']['target_y'] = ty
         room['contested_seconds'] = 0
         room['round'] += 1
-        room['shrink_step'] = min(room['shrink_step'] + 4, 60)
+        room['shrink_step'] = min(room['shrink_step'] + 8, 260)
+        now = time.time()
+        room['shrink']['active'] = False
+        room['shrink']['next_at'] = now + KOZ_SHRINK_INTERVAL
 
     def compute_control(room):
         zone = room['zone']
@@ -1525,6 +1786,313 @@ def init_boss_battle_socket(socketio):
             return None, True, inside_ids, core_ids
         return None, False, inside_ids, core_ids
 
+    def apply_powerup(room_id, room, sid, powerup):
+        now = time.time()
+        player = room['players'].get(sid)
+        if not player:
+            return
+        ptype = powerup['type']
+        cfg = KOZ_POWERUP_CONFIG.get(ptype, {})
+        effects = player.setdefault('effects', {
+            'speed_until': 0.0,
+            'rapid_until': 0.0,
+            'vision_until': 0.0,
+            'shield': 0
+        })
+        effect_payload = {
+            'type': ptype,
+            'label': cfg.get('label', ptype),
+            'username': player['username']
+        }
+
+        if ptype == 'speed-boost':
+            duration = cfg.get('duration', 7.0)
+            effects['speed_until'] = max(effects.get('speed_until', 0.0), now + duration)
+            effect_payload['duration'] = duration
+        elif ptype == 'shield':
+            amount = cfg.get('amount', 35)
+            effects['shield'] = int(clamp(effects.get('shield', 0) + amount, 0, 70))
+            effect_payload['shield'] = effects['shield']
+        elif ptype == 'rapid-fire':
+            duration = cfg.get('duration', 6.0)
+            effects['rapid_until'] = max(effects.get('rapid_until', 0.0), now + duration)
+            effect_payload['duration'] = duration
+        elif ptype == 'heal':
+            amount = cfg.get('amount', 30)
+            player['combat_hp'] = int(clamp(player.get('combat_hp', KOZ_COMBAT_MAX_HP) + amount, 0, KOZ_COMBAT_MAX_HP))
+            effect_payload['combatHp'] = player['combat_hp']
+        elif ptype == 'vision-ping':
+            duration = cfg.get('duration', 3.5)
+            effects['vision_until'] = max(effects.get('vision_until', 0.0), now + duration)
+            nearby = []
+            for other_sid, other in room['players'].items():
+                if other_sid == sid:
+                    continue
+                if math.hypot(other['x'] - player['x'], other['y'] - player['y']) <= 900:
+                    nearby.append({
+                        'sid': other_sid,
+                        'x': other['x'],
+                        'y': other['y'],
+                        'username': other['username'],
+                        'character': other['character']
+                    })
+            socketio.emit('koz_vision_ping', {
+                'duration': duration,
+                'reveals': nearby
+            }, to=sid)
+            effect_payload['duration'] = duration
+            effect_payload['revealCount'] = len(nearby)
+        elif ptype == 'ammo-pack':
+            amount = cfg.get('amount', 12)
+            player['bullets'] = int(clamp(player.get('bullets', 0) + amount, 0, 999))
+            effect_payload['bullets'] = player['bullets']
+
+        socketio.emit('koz_powerup_effect', effect_payload, to=sid)
+
+    def handle_player_down(room_id, room, target_sid, killer_sid, reason):
+        target = room['players'].get(target_sid)
+        if not target:
+            return
+        if reason == 'storm':
+            room['team_scores'][target_sid] = max(0, room['team_scores'].get(target_sid, 0) - KOZ_RESPAWN_PENALTY)
+            target['score'] = max(0, target.get('score', 0) - KOZ_RESPAWN_PENALTY)
+        else:
+            room['team_scores'][target_sid] = max(0, room['team_scores'].get(target_sid, 0) - KOZ_DEATH_PENALTY)
+            target['score'] = max(0, target.get('score', 0) - KOZ_DEATH_PENALTY)
+            target['deaths'] = int(target.get('deaths', 0) + 1)
+            if killer_sid and killer_sid in room['players'] and killer_sid != target_sid:
+                killer = room['players'][killer_sid]
+                killer['kills'] = int(killer.get('kills', 0) + 1)
+                room['team_scores'][killer_sid] = room['team_scores'].get(killer_sid, 0) + KOZ_KILL_SCORE
+                killer['score'] = killer.get('score', 0) + KOZ_KILL_SCORE
+
+        target['combat_hp'] = KOZ_COMBAT_MAX_HP
+        target['zone_hp'] = max(target.get('zone_hp', KOZ_STORM_MAX_HP), int(KOZ_STORM_MAX_HP * 0.6))
+        spawn_x, spawn_y = find_spawn_point(room, prefer_zone_ring=True)
+        target['x'] = spawn_x
+        target['y'] = spawn_y
+
+        socketio.emit('koz_player_down', {
+            'username': target['username'],
+            'sid': target_sid,
+            'reason': reason
+        }, room=get_koz_room_name(room_id))
+        socketio.emit('koz_player_position', {
+            'sid': target_sid,
+            'x': target['x'],
+            'y': target['y'],
+            'character': target['character'],
+            'weapon_type': target.get('weapon_type'),
+            'username': target['username'],
+            'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP)
+        }, room=get_koz_room_name(room_id), include_self=False)
+        socketio.emit('koz_self_position', {
+            'x': target['x'],
+            'y': target['y']
+        }, to=target_sid)
+
+    def apply_damage(room_id, room, target_sid, shooter_sid, damage, projectile):
+        target = room['players'].get(target_sid)
+        if not target:
+            return
+        shooter = room['players'].get(shooter_sid)
+        if not shooter:
+            shooter_sid = None
+        dmg = max(1, int(damage))
+        effects = target.setdefault('effects', {
+            'speed_until': 0.0,
+            'rapid_until': 0.0,
+            'vision_until': 0.0,
+            'shield': 0
+        })
+        shield = int(effects.get('shield', 0))
+        absorbed = min(shield, dmg)
+        dmg -= absorbed
+        effects['shield'] = max(0, shield - absorbed)
+
+        if dmg > 0:
+            target['combat_hp'] = max(0, int(target.get('combat_hp', KOZ_COMBAT_MAX_HP) - dmg))
+
+        socketio.emit('koz_damage_feedback', {
+            'target': target_sid,
+            'shooter': shooter_sid,
+            'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP),
+            'damage': dmg,
+            'absorbed': absorbed,
+            'weaponType': projectile.get('weapon_type'),
+            'shooterX': shooter.get('x') if shooter else None,
+            'shooterY': shooter.get('y') if shooter else None
+        }, to=target_sid)
+
+        down = target.get('combat_hp', KOZ_COMBAT_MAX_HP) <= 0
+        if down:
+            handle_player_down(room_id, room, target_sid, shooter_sid, 'combat')
+
+        socketio.emit('koz_player_hit', {
+            'target': target_sid,
+            'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP),
+            'down': down,
+            'targetName': target['username'],
+            'killer': shooter_sid,
+            'killerName': shooter.get('username') if shooter else None
+        }, room=get_koz_room_name(room_id))
+
+    def spawn_projectiles_for_shot(room, sid, aim_x, aim_y):
+        player = room['players'][sid]
+        weapon = get_weapon_cfg(player)
+        angle = math.atan2(aim_y - player['y'], aim_x - player['x'])
+        spawn_distance = KOZ_PLAYER_RADIUS + weapon['radius'] + 6
+        spawn_x = player['x'] + math.cos(angle) * spawn_distance
+        spawn_y = player['y'] + math.sin(angle) * spawn_distance
+
+        projectiles = []
+        for spread in weapon.get('spread', [0.0]):
+            shot_angle = angle + spread
+            room['projectile_seq'] += 1
+            projectile = {
+                'id': f"proj_{room['projectile_seq']}",
+                'x': spawn_x,
+                'y': spawn_y,
+                'vx': math.cos(shot_angle) * weapon['speed'],
+                'vy': math.sin(shot_angle) * weapon['speed'],
+                'radius': weapon['radius'],
+                'damage': weapon['damage'],
+                'lifetime': weapon['lifetime'],
+                'age': 0.0,
+                'weapon_type': player['weapon_type'],
+                'splash': weapon.get('splash', 0),
+                'pierce': int(weapon.get('pierce', 0)),
+                'bounces': int(weapon.get('bounces', 0)),
+                'shooter': sid,
+                'character': player['character'],
+                'color': weapon.get('color', '#ffffff')
+            }
+            room['projectiles'][projectile['id']] = projectile
+            projectiles.append(projectile)
+        return projectiles
+
+    def step_projectiles(room_id, room, dt):
+        updates = []
+        removed = []
+        destroyed_obstacles = []
+
+        for proj_id, projectile in list(room['projectiles'].items()):
+            projectile['age'] += dt
+            if projectile['age'] > projectile['lifetime']:
+                removed.append({'id': proj_id, 'reason': 'lifetime'})
+                del room['projectiles'][proj_id]
+                continue
+
+            projectile['x'] += projectile['vx'] * dt
+            projectile['y'] += projectile['vy'] * dt
+
+            bounced = False
+            if projectile['x'] <= projectile['radius'] or projectile['x'] >= KOZ_MAP_WIDTH - projectile['radius']:
+                if projectile['bounces'] > 0:
+                    projectile['bounces'] -= 1
+                    projectile['vx'] *= -1
+                    projectile['x'] = clamp(projectile['x'], projectile['radius'], KOZ_MAP_WIDTH - projectile['radius'])
+                    bounced = True
+                else:
+                    removed.append({'id': proj_id, 'reason': 'world'})
+                    del room['projectiles'][proj_id]
+                    continue
+            if projectile['y'] <= projectile['radius'] or projectile['y'] >= KOZ_MAP_HEIGHT - projectile['radius']:
+                if projectile['bounces'] > 0:
+                    projectile['bounces'] -= 1
+                    projectile['vy'] *= -1
+                    projectile['y'] = clamp(projectile['y'], projectile['radius'], KOZ_MAP_HEIGHT - projectile['radius'])
+                    bounced = True
+                else:
+                    removed.append({'id': proj_id, 'reason': 'world'})
+                    del room['projectiles'][proj_id]
+                    continue
+
+            hit_obstacle = False
+            for obs_id, obstacle in list(room.get('obstacles', {}).items()):
+                if circle_hits_obstacle(projectile['x'], projectile['y'], projectile['radius'], obstacle):
+                    hit_obstacle = True
+                    if obstacle.get('destructible'):
+                        obstacle['hp'] = max(0, int(obstacle.get('hp', 1) - 1))
+                        if obstacle['hp'] <= 0:
+                            destroyed_obstacles.append(obs_id)
+                            del room['obstacles'][obs_id]
+                    removed.append({'id': proj_id, 'reason': 'obstacle'})
+                    del room['projectiles'][proj_id]
+                    break
+            if hit_obstacle:
+                continue
+
+            hit_target = None
+            for target_sid, target in room['players'].items():
+                if target_sid == projectile['shooter']:
+                    continue
+                if math.hypot(projectile['x'] - target['x'], projectile['y'] - target['y']) <= (KOZ_PLAYER_RADIUS + projectile['radius']):
+                    hit_target = target_sid
+                    break
+
+            if hit_target:
+                apply_damage(room_id, room, hit_target, projectile['shooter'], projectile['damage'], projectile)
+                splash = projectile.get('splash', 0)
+                if splash > 0:
+                    for splash_sid, splash_target in room['players'].items():
+                        if splash_sid in (projectile['shooter'], hit_target):
+                            continue
+                        if math.hypot(projectile['x'] - splash_target['x'], projectile['y'] - splash_target['y']) <= splash:
+                            apply_damage(room_id, room, splash_sid, projectile['shooter'], max(1, int(projectile['damage'] * 0.55)), projectile)
+
+                if projectile['pierce'] > 0:
+                    projectile['pierce'] -= 1
+                    projectile['x'] += projectile['vx'] * dt * 0.25
+                    projectile['y'] += projectile['vy'] * dt * 0.25
+                else:
+                    removed.append({'id': proj_id, 'reason': 'hit'})
+                    del room['projectiles'][proj_id]
+                    continue
+
+            if proj_id in room['projectiles']:
+                updates.append({
+                    'id': proj_id,
+                    'x': projectile['x'],
+                    'y': projectile['y'],
+                    'vx': projectile['vx'],
+                    'vy': projectile['vy'],
+                    'age': projectile['age'],
+                    'bounced': bounced
+                })
+
+        return updates, removed, destroyed_obstacles
+
+    def emit_koz_state(room_id, room, contested, now):
+        shrink = room['shrink']
+        shrink_progress = 0.0
+        if shrink.get('active'):
+            denom = max(0.001, shrink['end_at'] - shrink['start_at'])
+            shrink_progress = clamp((now - shrink['start_at']) / denom, 0.0, 1.0)
+        socketio.emit('koz_state', {
+            'zone': room['zone'],
+            'controller': room['controller'],
+            'controllerName': room['score_labels'].get(room['controller']),
+            'contested': contested,
+            'teamScores': room['team_scores'],
+            'scoreLabels': room['score_labels'],
+            'timeLeft': room['time_left'],
+            'round': room['round'],
+            'phase': room['phase'],
+            'nextShrinkIn': get_next_shrink_seconds(room, now),
+            'shrink': {
+                'active': bool(shrink.get('active')),
+                'progress': shrink_progress,
+                'fromRadius': shrink.get('from_radius'),
+                'toRadius': shrink.get('to_radius')
+            },
+            'storm': {
+                'level': room['storm_level'],
+                'damage': KOZ_STORM_DAMAGE * (KOZ_STORM_FINAL_MULT if room['finale'] else 1.0),
+                'regen': KOZ_STORM_REGEN
+            }
+        }, room=get_koz_room_name(room_id))
+
     def koz_tick_loop(room_id):
         room = koz_rooms.get(room_id)
         if not room:
@@ -1538,118 +2106,71 @@ def init_boss_battle_socket(socketio):
 
             now = time.time()
             dt = now - room['last_tick']
-            if dt < 1.0:
-                time.sleep(0.1)
+            if dt < (KOZ_TICK_RATE * 0.5):
+                time.sleep(0.01)
                 continue
+            dt = min(dt, 0.12)
             room['last_tick'] = now
+            room['score_accumulator'] += dt
 
-            # Time limit
-            room['time_left'] = max(0, room['time_left'] - 1)
-
-            # Phase scaling based on remaining radius
-            radius_ratio = room['zone']['radius'] / room['zone']['base_radius']
-            room['phase'] = max(1, min(5, int((1 - radius_ratio) * 5) + 1))
-            room['storm_level'] = room['phase']
-
-            # Zone drift toward target
+            # Zone drift
             dx = room['zone']['target_x'] - room['zone']['x']
             dy = room['zone']['target_y'] - room['zone']['y']
             dist = math.sqrt(dx * dx + dy * dy)
-            if dist <= room['drift_speed']:
+            step = room['drift_speed'] * dt
+            if dist <= step:
                 room['zone']['x'] = room['zone']['target_x']
                 room['zone']['y'] = room['zone']['target_y']
             elif dist > 0:
-                room['zone']['x'] += (dx / dist) * room['drift_speed']
-                room['zone']['y'] += (dy / dist) * room['drift_speed']
+                room['zone']['x'] += (dx / dist) * step
+                room['zone']['y'] += (dy / dist) * step
 
-            pad = room['zone']['radius'] + 40
+            # Shrink timeline
+            shrink = room['shrink']
+            if shrink['active']:
+                denom = max(0.001, shrink['end_at'] - shrink['start_at'])
+                progress = clamp((now - shrink['start_at']) / denom, 0.0, 1.0)
+                room['zone']['radius'] = shrink['from_radius'] + (shrink['to_radius'] - shrink['from_radius']) * progress
+                room['zone']['core_radius'] = max(220, int(room['zone']['radius'] * 0.35))
+                if progress >= 1.0:
+                    shrink['active'] = False
+                    shrink['next_at'] = now + KOZ_SHRINK_INTERVAL
+                    tx, ty = pick_zone_center(room['zone']['radius'])
+                    room['zone']['target_x'] = tx
+                    room['zone']['target_y'] = ty
+                    socketio.emit('koz_zone_event', {
+                        'type': 'shrink_end',
+                        'zone': room['zone']
+                    }, room=get_koz_room_name(room_id))
+            elif room['zone']['radius'] > KOZ_MIN_RADIUS and now >= shrink['next_at']:
+                from_radius = float(room['zone']['radius'])
+                to_radius = float(max(KOZ_MIN_RADIUS, room['zone']['radius'] - room['shrink_step']))
+                shrink['active'] = True
+                shrink['from_radius'] = from_radius
+                shrink['to_radius'] = to_radius
+                shrink['start_at'] = now
+                shrink['end_at'] = now + KOZ_SHRINK_DURATION
+                socketio.emit('koz_zone_event', {
+                    'type': 'shrink_start',
+                    'zone': room['zone'],
+                    'fromRadius': from_radius,
+                    'toRadius': to_radius,
+                    'duration': KOZ_SHRINK_DURATION
+                }, room=get_koz_room_name(room_id))
+
+            if room['zone']['radius'] <= KOZ_MIN_RADIUS and not room['finale']:
+                room['finale'] = True
+                room['shrink_step'] = max(room['shrink_step'], 240)
+                socketio.emit('koz_zone_event', {
+                    'type': 'finale',
+                    'zone': room['zone']
+                }, room=get_koz_room_name(room_id))
+
+            pad = room['zone']['radius'] + 60
             room['zone']['x'] = clamp(room['zone']['x'], pad, KOZ_MAP_WIDTH - pad)
             room['zone']['y'] = clamp(room['zone']['y'], pad, KOZ_MAP_HEIGHT - pad)
 
-            controller, contested, inside_ids, core_ids = compute_control(room)
-            if contested:
-                room['contested_seconds'] += 1
-            else:
-                room['contested_seconds'] = 0
-
-            # Award score
-            if controller and not contested:
-                room['team_scores'].setdefault(controller, 0)
-                room['team_scores'][controller] += KOZ_SCORE_PER_SEC
-                if controller in room['players']:
-                    room['players'][controller]['score'] += KOZ_SCORE_PER_SEC
-                if controller in core_ids:
-                    room['team_scores'][controller] += KOZ_CORE_BONUS_PER_SEC
-                    if controller in room['players']:
-                        room['players'][controller]['score'] += KOZ_CORE_BONUS_PER_SEC
-
-            # Handle control change
-            if controller != room['controller']:
-                room['controller'] = controller
-                socketio.emit('koz_control_changed', {
-                    'controller': controller,
-                    'controllerName': room['score_labels'].get(controller),
-                    'contested': contested
-                }, room=get_koz_room_name(room_id))
-
-            # Storm damage and self-state updates
-            storm_mult = KOZ_STORM_FINAL_MULT if room['finale'] else 1.0
-            storm_damage = KOZ_STORM_DAMAGE * storm_mult
-            for sid, p in list(room['players'].items()):
-                dxp = p['x'] - room['zone']['x']
-                dyp = p['y'] - room['zone']['y']
-                distp = math.sqrt(dxp * dxp + dyp * dyp)
-                outside = distp > room['zone']['radius']
-                if outside:
-                    p['zone_hp'] = max(0, p.get('zone_hp', KOZ_STORM_MAX_HP) - storm_damage)
-                else:
-                    p['zone_hp'] = min(KOZ_STORM_MAX_HP, p.get('zone_hp', KOZ_STORM_MAX_HP) + KOZ_STORM_REGEN)
-
-                speed_mult = 1.0 if not outside else 0.85
-                if p['zone_hp'] < 40:
-                    speed_mult = min(speed_mult, 0.75)
-                p['speed_multiplier'] = speed_mult
-
-                if p['zone_hp'] <= 0:
-                    player_id = sid
-                    room['team_scores'][player_id] = max(0, room['team_scores'].get(player_id, 0) - KOZ_RESPAWN_PENALTY)
-                    p['score'] = max(0, p.get('score', 0) - KOZ_RESPAWN_PENALTY)
-                    p['zone_hp'] = int(KOZ_STORM_MAX_HP * 0.6)
-                    angle = random.random() * math.pi * 2
-                    spawn_r = max(room['zone']['radius'] * 0.85, KOZ_MIN_RADIUS * 0.9)
-                    p['x'] = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
-                    p['y'] = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
-                    socketio.emit('koz_player_down', {
-                        'username': p['username'],
-                        'sid': player_id
-                    }, room=get_koz_room_name(room_id))
-                    socketio.emit('koz_player_position', {
-                        'sid': sid,
-                        'x': p['x'],
-                        'y': p['y'],
-                        'character': p['character'],
-                        'username': p['username'],
-                        'hp': p.get('combat_hp', KOZ_COMBAT_MAX_HP)
-                    }, room=get_koz_room_name(room_id), include_self=False)
-                    socketio.emit('koz_self_position', {
-                        'x': p['x'],
-                        'y': p['y']
-                    }, to=sid)
-
-                socketio.emit('koz_self_state', {
-                    'zoneHp': p.get('zone_hp', KOZ_STORM_MAX_HP),
-                    'outside': outside,
-                    'speedMultiplier': p.get('speed_multiplier', 1.0),
-                    'combatHp': p.get('combat_hp', KOZ_COMBAT_MAX_HP),
-                    'storm': {
-                        'level': room['storm_level'],
-                        'damage': storm_damage,
-                        'regen': KOZ_STORM_REGEN
-                    },
-                    'phase': room['phase']
-                }, to=sid)
-
-            # Storm pulse (environmental pressure)
+            # Pulse pressure
             if now - room['last_pulse'] >= KOZ_PULSE_INTERVAL:
                 room['last_pulse'] = now
                 for sid, p in room['players'].items():
@@ -1658,63 +2179,144 @@ def init_boss_battle_socket(socketio):
                     distp = math.sqrt(dxp * dxp + dyp * dyp)
                     if distp > 1:
                         pull = KOZ_PULSE_PULL if distp > room['zone']['radius'] else KOZ_PULSE_PULL * 0.5
-                        p['x'] = clamp(p['x'] + (dxp / distp) * pull, 30, KOZ_MAP_WIDTH - 30)
-                        p['y'] = clamp(p['y'] + (dyp / distp) * pull, 30, KOZ_MAP_HEIGHT - 30)
+                        p['x'] = clamp(p['x'] + (dxp / distp) * pull, KOZ_PLAYER_RADIUS + 5, KOZ_MAP_WIDTH - KOZ_PLAYER_RADIUS - 5)
+                        p['y'] = clamp(p['y'] + (dyp / distp) * pull, KOZ_PLAYER_RADIUS + 5, KOZ_MAP_HEIGHT - KOZ_PLAYER_RADIUS - 5)
                         socketio.emit('koz_player_position', {
                             'sid': sid,
                             'x': p['x'],
                             'y': p['y'],
                             'character': p['character'],
+                            'weapon_type': p.get('weapon_type'),
                             'username': p['username'],
                             'hp': p.get('combat_hp', KOZ_COMBAT_MAX_HP)
                         }, room=get_koz_room_name(room_id), include_self=False)
-                        socketio.emit('koz_self_position', {
-                            'x': p['x'],
-                            'y': p['y']
-                        }, to=sid)
-                socketio.emit('koz_zone_event', {
-                    'type': 'pulse'
-                }, room=get_koz_room_name(room_id))
+                        socketio.emit('koz_self_position', {'x': p['x'], 'y': p['y']}, to=sid)
+                socketio.emit('koz_zone_event', {'type': 'pulse'}, room=get_koz_room_name(room_id))
 
-            # Shrink zone
-            if now - room['last_shrink'] >= KOZ_SHRINK_INTERVAL:
-                room['last_shrink'] = now
-                room['zone']['radius'] = max(KOZ_MIN_RADIUS, room['zone']['radius'] - room['shrink_step'])
-                room['zone']['core_radius'] = max(80, int(room['zone']['radius'] * 0.35))
-                tx, ty = pick_zone_center(room['zone']['radius'])
-                room['zone']['target_x'] = tx
-                room['zone']['target_y'] = ty
-                socketio.emit('koz_zone_event', {
-                    'type': 'shrink',
-                    'zone': room['zone'],
-                    'phase': room['phase'],
-                    'radius': room['zone']['radius']
-                }, room=get_koz_room_name(room_id))
+            # Player state and storm updates
+            storm_mult = KOZ_STORM_FINAL_MULT if room['finale'] else 1.0
+            storm_damage = KOZ_STORM_DAMAGE * storm_mult
+            for sid, p in list(room['players'].items()):
+                effects = p.setdefault('effects', {
+                    'speed_until': 0.0,
+                    'rapid_until': 0.0,
+                    'vision_until': 0.0,
+                    'shield': 0
+                })
+                distp = math.hypot(p['x'] - room['zone']['x'], p['y'] - room['zone']['y'])
+                outside = distp > room['zone']['radius']
+                if outside:
+                    p['zone_hp'] = max(0, p.get('zone_hp', KOZ_STORM_MAX_HP) - storm_damage * dt)
+                else:
+                    p['zone_hp'] = min(KOZ_STORM_MAX_HP, p.get('zone_hp', KOZ_STORM_MAX_HP) + KOZ_STORM_REGEN * dt)
 
-                if room['zone']['radius'] <= KOZ_MIN_RADIUS and not room['finale']:
-                    room['finale'] = True
-                    room['shrink_step'] = max(room['shrink_step'], 40)
-                    socketio.emit('koz_zone_event', {
-                        'type': 'finale',
-                        'zone': room['zone']
+                speed_mult = 1.0
+                if outside:
+                    speed_mult *= 0.84
+                if p['zone_hp'] < 35:
+                    speed_mult *= 0.82
+                if now < effects.get('speed_until', 0):
+                    speed_mult *= 1.35
+                p['speed_multiplier'] = speed_mult
+                p['rapid_fire'] = now < effects.get('rapid_until', 0)
+
+                if p['zone_hp'] <= 0:
+                    p['zone_hp'] = int(KOZ_STORM_MAX_HP * 0.55)
+                    handle_player_down(room_id, room, sid, None, 'storm')
+
+                if now - p.get('last_self_emit', 0) >= 0.15:
+                    p['last_self_emit'] = now
+                    socketio.emit('koz_self_state', {
+                        'zoneHp': p.get('zone_hp', KOZ_STORM_MAX_HP),
+                        'outside': outside,
+                        'speedMultiplier': p.get('speed_multiplier', 1.0),
+                        'combatHp': p.get('combat_hp', KOZ_COMBAT_MAX_HP),
+                        'bullets': p.get('bullets', 0),
+                        'shield': effects.get('shield', 0),
+                        'nextShrinkIn': get_next_shrink_seconds(room, now),
+                        'storm': {
+                            'level': room['storm_level'],
+                            'damage': storm_damage,
+                            'regen': KOZ_STORM_REGEN
+                        },
+                        'phase': room['phase']
+                    }, to=sid)
+
+            # Powerup spawning
+            if now >= room.get('next_powerup_at', 0) and len(room['powerups']) < KOZ_POWERUP_MAX:
+                spawned = spawn_powerup(room)
+                room['next_powerup_at'] = now + KOZ_POWERUP_RESPAWN_DELAY
+                if spawned:
+                    socketio.emit('koz_powerup_spawned', spawned, room=get_koz_room_name(room_id))
+
+            # Powerup pickup
+            for sid, p in list(room['players'].items()):
+                for powerup_id, powerup in list(room['powerups'].items()):
+                    if math.hypot(p['x'] - powerup['x'], p['y'] - powerup['y']) <= (KOZ_PLAYER_RADIUS + powerup.get('radius', KOZ_POWERUP_RADIUS)):
+                        del room['powerups'][powerup_id]
+                        apply_powerup(room_id, room, sid, powerup)
+                        socketio.emit('koz_powerup_collected', {
+                            'id': powerup_id,
+                            'type': powerup['type'],
+                            'by': sid,
+                            'username': p['username']
+                        }, room=get_koz_room_name(room_id))
+                        room['next_powerup_at'] = min(room.get('next_powerup_at', now + KOZ_POWERUP_RESPAWN_DELAY), now + KOZ_POWERUP_RESPAWN_DELAY)
+
+            # Projectiles (server authoritative)
+            projectile_updates, projectile_removed, obstacle_removed = step_projectiles(room_id, room, dt)
+            if projectile_updates:
+                socketio.emit('koz_projectile_positions', {'updates': projectile_updates}, room=get_koz_room_name(room_id))
+            if projectile_removed:
+                socketio.emit('koz_projectile_removed', {'items': projectile_removed}, room=get_koz_room_name(room_id))
+            if obstacle_removed:
+                socketio.emit('koz_obstacles_removed', {'ids': obstacle_removed}, room=get_koz_room_name(room_id))
+
+            # Score/time ticks at 1Hz
+            while room['score_accumulator'] >= KOZ_SCORE_TICK:
+                room['score_accumulator'] -= KOZ_SCORE_TICK
+                room['time_left'] = max(0, room['time_left'] - 1)
+                controller, contested, _, core_ids = compute_control(room)
+                if contested:
+                    room['contested_seconds'] += 1
+                else:
+                    room['contested_seconds'] = 0
+
+                if controller and not contested:
+                    room['team_scores'].setdefault(controller, 0)
+                    room['team_scores'][controller] += KOZ_SCORE_PER_SEC
+                    if controller in room['players']:
+                        room['players'][controller]['score'] = room['players'][controller].get('score', 0) + KOZ_SCORE_PER_SEC
+                    if controller in core_ids:
+                        room['team_scores'][controller] += KOZ_CORE_BONUS_PER_SEC
+                        if controller in room['players']:
+                            room['players'][controller]['score'] = room['players'][controller].get('score', 0) + KOZ_CORE_BONUS_PER_SEC
+
+                if controller != room['controller'] or contested:
+                    room['controller'] = controller
+                    socketio.emit('koz_control_changed', {
+                        'controller': controller,
+                        'controllerName': room['score_labels'].get(controller),
+                        'contested': contested
                     }, room=get_koz_room_name(room_id))
 
-            # Relocate if contested too long
-            if room['contested_seconds'] >= KOZ_CONTESTED_RELOCATE_SECONDS:
-                randomize_zone(room, reset_radius=False)
-                socketio.emit('koz_zone_event', {
-                    'type': 'contested_relocate',
-                    'zone': room['zone'],
-                    'round': room['round']
-                }, room=get_koz_room_name(room_id))
+                if room['contested_seconds'] >= KOZ_CONTESTED_RELOCATE_SECONDS:
+                    randomize_zone(room, reset_radius=False)
+                    socketio.emit('koz_zone_event', {
+                        'type': 'contested_relocate',
+                        'zone': room['zone'],
+                        'round': room['round']
+                    }, room=get_koz_room_name(room_id))
 
-            if room['time_left'] <= 30 and not room['finale']:
-                room['finale'] = True
-                room['shrink_step'] = max(room['shrink_step'], 40)
-                socketio.emit('koz_zone_event', {
-                    'type': 'finale',
-                    'zone': room['zone']
-                }, room=get_koz_room_name(room_id))
+                if room['time_left'] <= 45 and not room['finale']:
+                    room['finale'] = True
+                    room['shrink_step'] = max(room['shrink_step'], 260)
+                    socketio.emit('koz_zone_event', {'type': 'finale', 'zone': room['zone']}, room=get_koz_room_name(room_id))
+
+            # Phase/storm level tracks radius ratio
+            radius_ratio = room['zone']['radius'] / max(1.0, room['zone']['base_radius'])
+            room['phase'] = max(1, min(6, int((1 - radius_ratio) * 6) + 1))
+            room['storm_level'] = room['phase']
 
             # Match end conditions
             winner_id = None
@@ -1724,7 +2326,6 @@ def init_boss_battle_socket(socketio):
                     break
             if room['time_left'] <= 0 or winner_id:
                 room['match_over'] = True
-                # Determine winner by score if time expired
                 if not winner_id:
                     winner_id = max(room['team_scores'].items(), key=lambda x: x[1])[0] if room['team_scores'] else None
                 socketio.emit('koz_match_end', {
@@ -1735,23 +2336,12 @@ def init_boss_battle_socket(socketio):
                 }, room=get_koz_room_name(room_id))
                 break
 
-            # Broadcast state snapshot
-            socketio.emit('koz_state', {
-                'zone': room['zone'],
-                'controller': room['controller'],
-                'controllerName': room['score_labels'].get(room['controller']),
-                'contested': contested,
-                'teamScores': room['team_scores'],
-                'scoreLabels': room['score_labels'],
-                'timeLeft': room['time_left'],
-                'round': room['round'],
-                'phase': room['phase'],
-                'storm': {
-                    'level': room['storm_level'],
-                    'damage': KOZ_STORM_DAMAGE * (KOZ_STORM_FINAL_MULT if room['finale'] else 1.0),
-                    'regen': KOZ_STORM_REGEN
-                }
-            }, room=get_koz_room_name(room_id))
+            controller, contested, _, _ = compute_control(room)
+            if now - room.get('last_state_broadcast', 0.0) >= KOZ_STATE_BROADCAST_INTERVAL:
+                room['last_state_broadcast'] = now
+                emit_koz_state(room_id, room, contested, now)
+
+            time.sleep(KOZ_TICK_RATE)
 
         room = koz_rooms.get(room_id)
         if room:
@@ -1777,7 +2367,8 @@ def init_boss_battle_socket(socketio):
     def handle_koz_join(data):
         sid = request.sid
         username = data.get('username', 'Guest')
-        character = data.get('character', 'knight')
+        character = str(data.get('character', 'knight')).lower()
+        weapon_type = resolve_weapon_type(character, data.get('weapon_type') or data.get('selected_weapon'))
 
         existing_room_id, existing_room = get_koz_room_by_sid(sid)
         if existing_room:
@@ -1794,24 +2385,44 @@ def init_boss_battle_socket(socketio):
                 'timeLeft': existing_room['time_left'],
                 'round': existing_room['round'],
                 'phase': existing_room.get('phase', 1),
+                'nextShrinkIn': get_next_shrink_seconds(existing_room, time.time()),
                 'storm': {
                     'level': existing_room.get('storm_level', 1),
                     'damage': KOZ_STORM_DAMAGE,
                     'regen': KOZ_STORM_REGEN
                 },
                 'selfId': sid,
-                'map': {
-                    'width': KOZ_MAP_WIDTH,
-                    'height': KOZ_MAP_HEIGHT
-                },
+                'map': {'width': KOZ_MAP_WIDTH, 'height': KOZ_MAP_HEIGHT},
                 'rules': {
                     'targetScore': KOZ_TARGET_SCORE,
                     'timeLimit': KOZ_TIME_LIMIT,
                     'scorePerSec': KOZ_SCORE_PER_SEC,
                     'coreBonus': KOZ_CORE_BONUS_PER_SEC,
                     'stormMax': KOZ_STORM_MAX_HP
-                }
+                },
+                'obstacles': serialize_obstacles(existing_room),
+                'powerups': serialize_powerups(existing_room),
+                'players': serialize_players(existing_room)
             })
+            player = existing_room['players'].get(sid)
+            if player:
+                emit('koz_self_position', {'x': player.get('x', 0), 'y': player.get('y', 0)}, to=sid)
+                effects = player.get('effects', {})
+                emit('koz_self_state', {
+                    'zoneHp': player.get('zone_hp', KOZ_STORM_MAX_HP),
+                    'outside': math.hypot(player.get('x', 0) - existing_room['zone']['x'], player.get('y', 0) - existing_room['zone']['y']) > existing_room['zone']['radius'],
+                    'speedMultiplier': player.get('speed_multiplier', 1.0),
+                    'combatHp': player.get('combat_hp', KOZ_COMBAT_MAX_HP),
+                    'bullets': player.get('bullets', 0),
+                    'shield': effects.get('shield', 0),
+                    'nextShrinkIn': get_next_shrink_seconds(existing_room, time.time()),
+                    'storm': {
+                        'level': existing_room.get('storm_level', 1),
+                        'damage': KOZ_STORM_DAMAGE * (KOZ_STORM_FINAL_MULT if existing_room.get('finale') else 1.0),
+                        'regen': KOZ_STORM_REGEN
+                    },
+                    'phase': existing_room.get('phase', 1)
+                }, to=sid)
             return
 
         room_id, room = get_or_create_open_koz_room()
@@ -1819,21 +2430,30 @@ def init_boss_battle_socket(socketio):
         join_room(room_name)
         koz_sid_mapping[sid] = room_id
         display_name = get_unique_display_name(room, username)
+        spawn_x, spawn_y = find_spawn_point(room, prefer_zone_ring=True)
 
-        angle = random.random() * math.pi * 2
-        spawn_r = room['zone']['radius'] * 0.6
-        spawn_x = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
-        spawn_y = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
         room['players'][sid] = {
             'username': display_name,
             'character': character,
+            'weapon_type': weapon_type,
             'score': 0,
-            'x': data.get('x', spawn_x),
-            'y': data.get('y', spawn_y),
+            'kills': 0,
+            'deaths': 0,
+            'x': spawn_x,
+            'y': spawn_y,
             'zone_hp': KOZ_STORM_MAX_HP,
             'combat_hp': KOZ_COMBAT_MAX_HP,
             'last_move': time.time(),
-            'speed_multiplier': 1.0
+            'last_shot_at': 0.0,
+            'speed_multiplier': 1.0,
+            'rapid_fire': False,
+            'bullets': int(clamp(data.get('bullets', 60), 0, 999)),
+            'effects': {
+                'speed_until': 0.0,
+                'rapid_until': 0.0,
+                'vision_until': 0.0,
+                'shield': 0
+            }
         }
         room['team_scores'].setdefault(sid, 0)
         room['score_labels'][sid] = display_name
@@ -1846,28 +2466,47 @@ def init_boss_battle_socket(socketio):
             'timeLeft': room['time_left'],
             'round': room['round'],
             'phase': room.get('phase', 1),
+            'nextShrinkIn': get_next_shrink_seconds(room, time.time()),
             'storm': {
                 'level': room.get('storm_level', 1),
                 'damage': KOZ_STORM_DAMAGE,
                 'regen': KOZ_STORM_REGEN
             },
             'selfId': sid,
-            'map': {
-                'width': KOZ_MAP_WIDTH,
-                'height': KOZ_MAP_HEIGHT
-            },
+            'map': {'width': KOZ_MAP_WIDTH, 'height': KOZ_MAP_HEIGHT},
             'rules': {
                 'targetScore': KOZ_TARGET_SCORE,
                 'timeLimit': KOZ_TIME_LIMIT,
                 'scorePerSec': KOZ_SCORE_PER_SEC,
                 'coreBonus': KOZ_CORE_BONUS_PER_SEC,
                 'stormMax': KOZ_STORM_MAX_HP
-            }
+            },
+            'obstacles': serialize_obstacles(room),
+            'powerups': serialize_powerups(room),
+            'players': serialize_players(room)
         })
+        emit('koz_self_position', {'x': spawn_x, 'y': spawn_y}, to=sid)
+        emit('koz_self_state', {
+            'zoneHp': KOZ_STORM_MAX_HP,
+            'outside': False,
+            'speedMultiplier': 1.0,
+            'combatHp': KOZ_COMBAT_MAX_HP,
+            'bullets': room['players'][sid].get('bullets', 0),
+            'shield': 0,
+            'nextShrinkIn': get_next_shrink_seconds(room, time.time()),
+            'storm': {
+                'level': room.get('storm_level', 1),
+                'damage': KOZ_STORM_DAMAGE,
+                'regen': KOZ_STORM_REGEN
+            },
+            'phase': room.get('phase', 1)
+        }, to=sid)
 
         socketio.emit('koz_player_joined', {
             'sid': sid,
-            'username': display_name
+            'username': display_name,
+            'character': character,
+            'weapon_type': weapon_type
         }, room=room_name, include_self=False)
 
         if not room['task_running']:
@@ -1887,7 +2526,7 @@ def init_boss_battle_socket(socketio):
 
         now = time.time()
         last_move = player.get('last_move', now)
-        dt = max(0.02, min(0.2, now - last_move))
+        dt = max(0.02, min(0.25, now - last_move))
         player['last_move'] = now
         max_step = KOZ_BASE_SPEED * dt * player.get('speed_multiplier', 1.0)
         dx = desired_x - player['x']
@@ -1897,19 +2536,20 @@ def init_boss_battle_socket(socketio):
             desired_x = player['x'] + (dx / dist) * max_step
             desired_y = player['y'] + (dy / dist) * max_step
 
-        margin = KOZ_PLAYER_RADIUS
+        margin = KOZ_PLAYER_RADIUS + 4
         desired_x = clamp(desired_x, margin, KOZ_MAP_WIDTH - margin)
         desired_y = clamp(desired_y, margin, KOZ_MAP_HEIGHT - margin)
 
-        corrected = False
         min_dist = KOZ_PLAYER_RADIUS * 2
         for other_sid, other in room['players'].items():
             if other_sid == sid:
                 continue
-            desired_x, desired_y, did_correct = resolve_player_collision(
+            desired_x, desired_y, _ = resolve_player_collision(
                 desired_x, desired_y, other.get('x', desired_x), other.get('y', desired_y), min_dist
             )
-            corrected = corrected or did_correct
+
+        for obstacle in room.get('obstacles', {}).values():
+            desired_x, desired_y, _ = resolve_circle_obstacle(desired_x, desired_y, KOZ_PLAYER_RADIUS, obstacle)
 
         desired_x = clamp(desired_x, margin, KOZ_MAP_WIDTH - margin)
         desired_y = clamp(desired_y, margin, KOZ_MAP_HEIGHT - margin)
@@ -1920,14 +2560,12 @@ def init_boss_battle_socket(socketio):
             'x': desired_x,
             'y': desired_y,
             'character': room['players'][sid]['character'],
+            'weapon_type': room['players'][sid].get('weapon_type'),
             'username': room['players'][sid]['username'],
             'hp': room['players'][sid].get('combat_hp', KOZ_COMBAT_MAX_HP)
         }, room=get_koz_room_name(room_id), include_self=False)
 
-        emit('koz_self_position', {
-            'x': desired_x,
-            'y': desired_y
-        }, to=sid)
+        emit('koz_self_position', {'x': desired_x, 'y': desired_y}, to=sid)
 
     @socketio.on('koz_shoot')
     def handle_koz_shoot(data):
@@ -1935,63 +2573,75 @@ def init_boss_battle_socket(socketio):
         room_id, room = get_koz_room_by_sid(sid)
         if not room or sid not in room['players']:
             return
-        emit('koz_bullet', {
-            'bulletX': data.get('bulletX'),
-            'bulletY': data.get('bulletY'),
-            'dx': data.get('dx'),
-            'dy': data.get('dy'),
-            'character': room['players'][sid]['character'],
-            'shooter': sid,
-            'target': data.get('target')
-        }, room=get_koz_room_name(room_id), include_self=False)
+        player = room['players'][sid]
+        weapon = get_weapon_cfg(player)
+        now = time.time()
+        rapid_mult = 0.68 if player.get('rapid_fire') else 1.0
+        cooldown = weapon['cooldown'] * rapid_mult
+        if now - player.get('last_shot_at', 0) < cooldown:
+            emit('koz_shot_rejected', {'reason': 'cooldown', 'remaining': max(0.0, cooldown - (now - player.get('last_shot_at', 0)))}, to=sid)
+            return
+        if player.get('bullets', 0) <= 0:
+            emit('koz_shot_rejected', {'reason': 'ammo'}, to=sid)
+            return
+        if len(room.get('projectiles', {})) > 700:
+            emit('koz_shot_rejected', {'reason': 'busy'}, to=sid)
+            return
+
+        aim_x = data.get('aimX')
+        aim_y = data.get('aimY')
+        if aim_x is None or aim_y is None:
+            # backward compatibility for older clients sending vector dx/dy
+            dx = float(data.get('dx', 0.0))
+            dy = float(data.get('dy', 0.0))
+            mag = math.hypot(dx, dy) or 1.0
+            aim_x = player['x'] + (dx / mag) * 1000
+            aim_y = player['y'] + (dy / mag) * 1000
+        try:
+            aim_x = float(aim_x)
+            aim_y = float(aim_y)
+        except (TypeError, ValueError):
+            emit('koz_shot_rejected', {'reason': 'aim'}, to=sid)
+            return
+        if not math.isfinite(aim_x) or not math.isfinite(aim_y):
+            emit('koz_shot_rejected', {'reason': 'aim'}, to=sid)
+            return
+
+        player['last_shot_at'] = now
+        player['bullets'] = max(0, int(player.get('bullets', 0) - 1))
+        spawned = spawn_projectiles_for_shot(room, sid, aim_x, aim_y)
+        payload = []
+        for projectile in spawned:
+            payload.append({
+                'id': projectile['id'],
+                'x': projectile['x'],
+                'y': projectile['y'],
+                'vx': projectile['vx'],
+                'vy': projectile['vy'],
+                'radius': projectile['radius'],
+                'weaponType': projectile['weapon_type'],
+                'character': projectile['character'],
+                'shooter': projectile['shooter'],
+                'color': projectile.get('color')
+            })
+        socketio.emit('koz_projectile_spawned', {'projectiles': payload}, room=get_koz_room_name(room_id))
+
+        # Legacy compatibility for older clients still listening for koz_bullet.
+        if payload:
+            first = payload[0]
+            socketio.emit('koz_bullet', {
+                'bulletX': first['x'],
+                'bulletY': first['y'],
+                'dx': first['vx'],
+                'dy': first['vy'],
+                'character': player['character'],
+                'shooter': sid
+            }, room=get_koz_room_name(room_id), include_self=False)
 
     @socketio.on('koz_hit_player')
     def handle_koz_hit_player(data):
-        sid = request.sid
-        room_id, room = get_koz_room_by_sid(sid)
-        if not room or sid not in room['players']:
-            return
-        target_sid = data.get('target')
-        if not target_sid or target_sid not in room['players'] or target_sid == sid:
-            return
-        damage = int(data.get('damage', KOZ_BULLET_DAMAGE))
-        target = room['players'][target_sid]
-        target['combat_hp'] = max(0, target.get('combat_hp', KOZ_COMBAT_MAX_HP) - damage)
-
-        down = target['combat_hp'] <= 0
-        if down:
-            target['combat_hp'] = KOZ_COMBAT_MAX_HP
-            # Award points to shooter and apply penalty to target
-            room['team_scores'].setdefault(sid, 0)
-            room['team_scores'][sid] += KOZ_KILL_SCORE
-            room['team_scores'][target_sid] = max(0, room['team_scores'].get(target_sid, 0) - KOZ_DEATH_PENALTY)
-
-            angle = random.random() * math.pi * 2
-            spawn_r = max(room['zone']['radius'] * 0.8, KOZ_MIN_RADIUS * 0.9)
-            target['x'] = clamp(room['zone']['x'] + math.cos(angle) * spawn_r, 30, KOZ_MAP_WIDTH - 30)
-            target['y'] = clamp(room['zone']['y'] + math.sin(angle) * spawn_r, 30, KOZ_MAP_HEIGHT - 30)
-
-            socketio.emit('koz_player_position', {
-                'sid': target_sid,
-                'x': target['x'],
-                'y': target['y'],
-                'character': target['character'],
-                'username': target['username'],
-                'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP)
-            }, room=get_koz_room_name(room_id), include_self=False)
-            socketio.emit('koz_self_position', {
-                'x': target['x'],
-                'y': target['y']
-            }, to=target_sid)
-
-        socketio.emit('koz_player_hit', {
-            'target': target_sid,
-            'hp': target.get('combat_hp', KOZ_COMBAT_MAX_HP),
-            'down': down,
-            'targetName': target['username'],
-            'killer': sid,
-            'killerName': room['players'][sid]['username']
-        }, room=get_koz_room_name(room_id))
+        # Deprecated client-driven hit event. Damage is now server-authoritative via projectile simulation.
+        return
 
     @socketio.on('koz_leave')
     def handle_koz_leave(data):
@@ -2011,6 +2661,10 @@ def init_boss_battle_socket(socketio):
             room['controller'] = None
         if sid in koz_sid_mapping:
             del koz_sid_mapping[sid]
+        # Clean up active projectiles owned by this player.
+        for proj_id, projectile in list(room.get('projectiles', {}).items()):
+            if projectile.get('shooter') == sid:
+                del room['projectiles'][proj_id]
         leave_room(get_koz_room_name(room_id))
         emit('koz_player_left', {'username': username, 'sid': sid}, room=get_koz_room_name(room_id))
         if len(room['players']) == 0:

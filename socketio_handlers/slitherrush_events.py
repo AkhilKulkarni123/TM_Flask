@@ -7,7 +7,6 @@ from flask_login import current_user
 from flask_socketio import join_room, leave_room
 
 from model.user import User
-from socketio_handlers import social_core
 from .slitherrush_manager import SlitherRushManager
 from .slitherrush_simulation import SlitherRushSimulation
 
@@ -108,12 +107,7 @@ def _resolve_user_identity(payload):
 
 
 def _resolve_party_id_for_user(user_id: Optional[int]) -> Optional[str]:
-    if not user_id:
-        return None
-    party = social_core.get_party_for_user(int(user_id))
-    if not party:
-        return None
-    return str(party.id)
+    return None
 
 
 def init_slitherrush_socket(socketio) -> None:

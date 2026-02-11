@@ -20,8 +20,8 @@ class SlitherRushManager:
     HEIGHT = 3000
 
     MAX_PLAYERS_PER_ARENA = 24
-    MIN_PLAYERS_TO_START = 2
-    WAITING_COUNTDOWN = 20.0
+    MIN_PLAYERS_TO_START = 1
+    WAITING_COUNTDOWN = 0.0
     MATCH_DURATION = 300.0
     ENDING_DURATION = 12.0
 
@@ -34,8 +34,8 @@ class SlitherRushManager:
 
     HEAD_RADIUS = 11.0
     ORB_PICKUP_RADIUS = 19.0
-    MIN_ORBS_PER_ARENA = 180
-    MAX_ORBS_PER_ARENA = 900
+    MIN_ORBS_PER_ARENA = 320
+    MAX_ORBS_PER_ARENA = 1200
 
     KILL_BONUS = 25
     SURVIVAL_BONUS_PER_SECOND = 1
@@ -76,7 +76,7 @@ class SlitherRushManager:
             'bounds': {'width': self.WIDTH, 'height': self.HEIGHT},
             'tick_rate': self.TICK_RATE,
             'max_players': self.MAX_PLAYERS_PER_ARENA,
-            'state': 'waiting',
+            'state': 'active',
             'created_at': now,
             'countdown_end_at': None,
             'match_end_at': None,
@@ -261,7 +261,8 @@ class SlitherRushManager:
     def _ensure_orb_floor(self, arena: Dict) -> None:
         target = self.MIN_ORBS_PER_ARENA
         deficit = max(0, target - len(arena['energy_orbs']))
-        for _ in range(min(deficit, 8)):
+        spawn_budget = min(deficit, max(12, min(48, int(deficit * 0.22))))
+        for _ in range(spawn_budget):
             self._spawn_orb(arena, value=1)
 
     def _drop_death_orbs(self, arena: Dict, player: Dict) -> None:
@@ -398,7 +399,7 @@ class SlitherRushManager:
         self.socketio.emit('slitherrush_end', payload, room=arena['room'])
 
     def _reset_after_ending(self, arena: Dict) -> None:
-        arena['state'] = 'waiting'
+        arena['state'] = 'active'
         arena['countdown_end_at'] = None
         arena['ending_end_at'] = None
         arena['end_reason'] = None
@@ -443,9 +444,13 @@ class SlitherRushManager:
 
         role = 'spectator'
         ready = False
-        if arena['state'] == 'waiting' and len(arena['players']) < arena['max_players']:
-            role = 'queued'
-            ready = True
+        join_live = len(arena['players']) < arena['max_players'] and arena['state'] in ('waiting', 'active')
+        if join_live:
+            if arena['state'] == 'waiting':
+                role = 'queued'
+                ready = True
+            else:
+                role = 'player'
 
         direction = self._normalize_direction(payload.get('direction'))
         sx, sy = self._random_spawn(arena)
@@ -478,7 +483,9 @@ class SlitherRushManager:
             'last_input_at': time.time(),
         }
 
-        if not ready:
+        if arena['state'] == 'active' and join_live:
+            self._assign_player_state_for_new_match(arena, player)
+        elif not ready:
             self._assign_spectator_state(player)
 
         arena['players'][sid] = player
@@ -520,12 +527,19 @@ class SlitherRushManager:
         arena = self.arenas.get(arena_id)
         if not arena:
             return None
-        if arena['state'] != 'waiting':
-            return arena
 
         player = arena['players'].get(sid)
         if not player:
             return None
+
+        if arena['state'] == 'active':
+            if player.get('status') != 'alive':
+                self._assign_player_state_for_new_match(arena, player)
+                player['ready'] = False
+            return arena
+
+        if arena['state'] != 'waiting':
+            return arena
 
         player['ready'] = True
         arena['ready_players'].add(sid)
@@ -866,12 +880,8 @@ class SlitherRushManager:
         self._ensure_orb_floor(arena)
         self._update_spectator_targets(arena)
 
-        alive_count = len(self._alive_players(arena))
-        if alive_count <= 1:
-            self._end_match(arena, 'last_slither_standing', now)
-            return
-
-        if arena.get('match_end_at') and now >= arena['match_end_at']:
+        # Endless slither mode: keep the arena running continuously.
+        if arena.get('match_end_at') and arena['match_end_at'] > 0 and now >= arena['match_end_at']:
             self._end_match(arena, 'time_limit', now)
 
     def _step_ending(self, arena: Dict, now: float) -> None:

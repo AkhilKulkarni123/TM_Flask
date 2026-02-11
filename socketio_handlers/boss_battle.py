@@ -1123,11 +1123,13 @@ def init_boss_battle_socket(socketio):
     @socketio.on('pvp_join')
     def handle_pvp_join(data):
         """Handle player joining PVP arena (assigns an open room or creates a new one)"""
+        data = data or {}
         sid = request.sid
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
         bullets = data.get('bullets', 0)
         lives = data.get('lives', 5)
+        requested_room_id = str(data.get('room_id') or data.get('roomId') or '').strip()
 
         # If already in a room, just resend state
         existing_room_id, existing_room = get_room_by_sid(sid)
@@ -1146,7 +1148,11 @@ def init_boss_battle_socket(socketio):
             })
             return
 
-        room_id, room = get_or_create_open_room()
+        if requested_room_id and requested_room_id in pvp_rooms and len(pvp_rooms[requested_room_id]['players']) < MAX_PVP_PLAYERS:
+            room_id = requested_room_id
+            room = pvp_rooms[room_id]
+        else:
+            room_id, room = get_or_create_open_room()
         room_name = get_pvp_room_name(room_id)
 
         # Capture existing opponent before adding player

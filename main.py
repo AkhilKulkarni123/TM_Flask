@@ -29,6 +29,7 @@ from __init__ import app, db, login_manager, socketio
 # Import boss battle socket handlers
 from socketio_handlers.boss_battle import init_boss_battle_socket
 from socketio_handlers.slitherrush_events import init_slitherrush_socket
+from socketio_handlers.social_events import init_social_socket
 
 # API endpoints
 from api.user import user_api 
@@ -48,6 +49,7 @@ from api.post import post_api
 from api.snakes_game import snakes_game_api  # existing SNAKES GAME API
 from api.study import study_api
 from api.feedback_api import feedback_api
+from api.social import social_api
 
 # 🔹 NEW: import the extended Snakes & Ladders blueprint
 from api.snakes_extended import snakes_bp
@@ -62,6 +64,7 @@ from model.study import Study, initStudies
 from model.classroom import Classroom
 from model.post import Post, init_posts
 from model.microblog import MicroBlog, Topic, init_microblogs
+import model.social  # noqa: F401 - ensure social model tables are registered
 from hacks.jokes import initJokes
 # 🔹 CHANGED: only import SnakesGameData, not initSnakesGame
 from model.snakes_game import SnakesGameData  # NEW SNAKES GAME MODEL
@@ -189,6 +192,7 @@ app.register_blueprint(student_api)
 app.register_blueprint(study_api)
 app.register_blueprint(classroom_api)
 app.register_blueprint(feedback_api)
+app.register_blueprint(social_api)
 app.register_blueprint(joke_api)
 app.register_blueprint(post_api)
 app.register_blueprint(game_api)
@@ -213,6 +217,7 @@ with app.app_context():
 # Initialize boss battle and PVP socket handlers
 init_boss_battle_socket(socketio)
 init_slitherrush_socket(socketio)
+init_social_socket(socketio)
 
 # ============================================================================
 # FLASK-LOGIN CONFIGURATION

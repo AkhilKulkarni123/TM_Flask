@@ -53,6 +53,7 @@ def join_boss_battle():
         dev_mode = data.get('dev_mode', False)
         guest_id = data.get('guest_id')
         guest_name = data.get('guest_name')
+        preferred_room_id = data.get('room_id')
 
         user = _get_user_from_token()
         is_guest = False
@@ -78,11 +79,21 @@ def join_boss_battle():
         # Find an active room with space (max 10 players) or create a new one
         MAX_PLAYERS_PER_ROOM = 10
         room = None
+        if preferred_room_id:
+            preferred = BossRoom.query.filter_by(
+                room_id=str(preferred_room_id),
+                is_active=True,
+                is_completed=False,
+            ).first()
+            if preferred and len(preferred.players) < MAX_PLAYERS_PER_ROOM:
+                room = preferred
+
         active_rooms = BossRoom.query.filter_by(is_active=True, is_completed=False).all()
-        for candidate in active_rooms:
-            if len(candidate.players) < MAX_PLAYERS_PER_ROOM:
-                room = candidate
-                break
+        if room is None:
+            for candidate in active_rooms:
+                if len(candidate.players) < MAX_PLAYERS_PER_ROOM:
+                    room = candidate
+                    break
 
         if not room:
             # All rooms full or none exist - create new room

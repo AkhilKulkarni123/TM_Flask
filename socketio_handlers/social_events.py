@@ -258,7 +258,10 @@ def init_social_socket(socketio) -> None:
         if row and row.status == "pending":
             socketio.emit(
                 "friend_request_received",
-                {"from_user": social_core.user_summary(user_id)},
+                {
+                    "request_id": row.id,
+                    "from_user": social_core.user_summary(user_id),
+                },
                 room=_user_room(target_user_id),
                 namespace=SOCIAL_NAMESPACE,
             )

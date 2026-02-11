@@ -85,12 +85,24 @@ def token_required(roles=None):
                             }, 403
                 # Store the user in Flask's g for downstream use
                 g.current_user = current_user
+            except jwt.ExpiredSignatureError:
+                return {
+                    "message": "Authentication token expired",
+                    "data": None,
+                    "error": "Unauthorized",
+                }, 401
+            except jwt.InvalidTokenError:
+                return {
+                    "message": "Invalid authentication token",
+                    "data": None,
+                    "error": "Unauthorized",
+                }, 401
             except Exception as e:
                 return {
-                    "message": "Something went wrong decoding the token!",
+                    "message": "Unable to validate authentication token",
                     "data": None,
                     "error": str(e),
-                }, 500
+                }, 401
 
             # CORS preflight requests should be allowed through
             if request.method == 'OPTIONS':

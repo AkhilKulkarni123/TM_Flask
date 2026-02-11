@@ -1,10 +1,13 @@
 import time
 from typing import Optional
 
-from flask import request
+import jwt
+from flask import current_app, request
 from flask_login import current_user
 from flask_socketio import join_room, leave_room
 
+from model.user import User
+from socketio_handlers import social_core
 from .slitherrush_manager import SlitherRushManager
 from .slitherrush_simulation import SlitherRushSimulation
 
@@ -75,26 +78,42 @@ def cleanup_disconnected_player(sid: str) -> None:
         _manager.emit_status_snapshot()
 
 
-def _resolve_user_identity(payload):
-    default_name = str((payload or {}).get('username') or 'Guest').strip() or 'Guest'
-
-    user_id = None
-    username = default_name
+def _resolve_socket_user() -> Optional[User]:
     try:
         if current_user and getattr(current_user, 'is_authenticated', False):
-            user_id = int(getattr(current_user, 'id'))
-            username = str(getattr(current_user, 'name', None) or default_name)
+            return User.query.get(int(current_user.id))
     except Exception:
         pass
 
-    provided_uid = (payload or {}).get('user_id')
-    if user_id is None and provided_uid is not None:
-        try:
-            user_id = int(provided_uid)
-        except (TypeError, ValueError):
-            user_id = None
+    token_name = current_app.config.get('JWT_TOKEN_NAME', 'jwt')
+    token = request.cookies.get(token_name)
+    if not token:
+        return None
+    try:
+        decoded = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        uid = decoded.get('_uid')
+        if not uid:
+            return None
+        return User.query.filter_by(_uid=uid).first()
+    except Exception:
+        return None
 
-    return user_id, username[:24]
+
+def _resolve_user_identity(payload):
+    default_name = str((payload or {}).get('username') or 'Guest').strip() or 'Guest'
+    user = _resolve_socket_user()
+    if user:
+        return int(user.id), str(getattr(user, 'name', None) or default_name)[:24]
+    return None, default_name[:24]
+
+
+def _resolve_party_id_for_user(user_id: Optional[int]) -> Optional[str]:
+    if not user_id:
+        return None
+    party = social_core.get_party_for_user(int(user_id))
+    if not party:
+        return None
+    return str(party.id)
 
 
 def init_slitherrush_socket(socketio) -> None:
@@ -113,6 +132,11 @@ def init_slitherrush_socket(socketio) -> None:
         payload = data or {}
         sid = request.sid
         user_id, fallback_name = _resolve_user_identity(payload)
+        party_id = _resolve_party_id_for_user(user_id)
+        if party_id:
+            payload['party_id'] = party_id
+        else:
+            payload.pop('party_id', None)
 
         with _manager.lock:
             joined = _manager.join_player(sid, payload, user_id=user_id, username_fallback=fallback_name)

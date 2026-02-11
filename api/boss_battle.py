@@ -159,6 +159,18 @@ def get_room_status(room_id):
     except Exception as e:
         logger.error(f"Error getting room status: {str(e)}")
         return jsonify({'error': 'Failed to get room status'}), 500
+    
+
+@boss_api.route('/reset-rooms', methods=['POST'])
+def reset_rooms():
+    """Clear all boss rooms"""
+    try:
+        BossRoom.query.delete()
+        db.session.commit()
+        return jsonify({'message': 'All rooms cleared'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
 @boss_api.route('/damage', methods=['POST'])

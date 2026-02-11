@@ -132,7 +132,7 @@ class SlitherRushManager:
 
         active_candidates = [
             a for a in self.arenas.values()
-            if a['state'] in ('active', 'ending') and len(a['players']) < a['max_players']
+            if a['state'] == 'active' and len(a['players']) < a['max_players']
         ]
         if active_candidates:
             active_candidates.sort(key=lambda x: x['created_at'])

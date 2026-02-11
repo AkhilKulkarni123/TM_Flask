@@ -86,6 +86,7 @@ class SlitherRushManager:
             'energy_orbs': [],
             'ready_players': set(),
             'party_targets': {},
+            'empty_respawn_at': None,
             'last_snapshot_at': 0.0,
             'last_leaderboard_at': 0.0,
             'stats_persisted': False,
@@ -119,8 +120,13 @@ class SlitherRushManager:
             arena_id = self.party_to_arena.get(party_id)
             if arena_id and arena_id in self.arenas:
                 arena = self.arenas[arena_id]
-                if len(arena['players']) < arena['max_players']:
+                if (
+                    len(arena['players']) < arena['max_players']
+                    and arena.get('state') in ('waiting', 'active')
+                ):
                     return arena
+                # Mapping is stale (ending/full arena), force reselection.
+                self.party_to_arena.pop(party_id, None)
 
         waiting_candidates = [
             a for a in self.arenas.values()
@@ -405,6 +411,7 @@ class SlitherRushManager:
         arena['end_reason'] = None
         arena['results'] = []
         arena['match_end_at'] = None
+        arena['empty_respawn_at'] = None
         arena['energy_orbs'].clear()
         arena['party_targets'].clear()
         arena['ready_players'].clear()
@@ -879,6 +886,21 @@ class SlitherRushManager:
         self._step_orb_pickups(arena)
         self._ensure_orb_floor(arena)
         self._update_spectator_targets(arena)
+
+        # Endless mode should never sit idle. If everyone is spectating, respawn
+        # all connected players so the arena is immediately playable again.
+        alive_players = self._alive_players(arena)
+        if not alive_players and arena['players']:
+            if arena.get('empty_respawn_at') is None:
+                arena['empty_respawn_at'] = now + 0.25
+            elif now >= arena['empty_respawn_at']:
+                arena['empty_respawn_at'] = None
+                for player in arena['players'].values():
+                    self._assign_player_state_for_new_match(arena, player)
+                    player['ready'] = False
+                self._ensure_orb_floor(arena)
+        else:
+            arena['empty_respawn_at'] = None
 
         # Endless slither mode: keep the arena running continuously.
         if arena.get('match_end_at') and arena['match_end_at'] > 0 and now >= arena['match_end_at']:

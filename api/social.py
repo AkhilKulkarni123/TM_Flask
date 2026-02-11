@@ -6,9 +6,11 @@ import imghdr
 import os
 import uuid
 
-from flask import Blueprint, current_app, g, jsonify, request
+import jwt
+from flask import Blueprint, current_app, jsonify, request
+from flask_login import current_user
 
-from api.jwt_authorize import token_required
+from model.user import User
 from socketio_handlers import social_core
 
 
@@ -22,6 +24,30 @@ ALLOWED_MIME = {
 }
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def _resolve_authenticated_user():
+    try:
+        if current_user and getattr(current_user, "is_authenticated", False):
+            user = User.query.get(int(current_user.id))
+            if user:
+                return user
+    except Exception:
+        pass
+
+    token_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    token = request.cookies.get(token_name)
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+        uid = payload.get("_uid")
+        if not uid:
+            return None
+        return User.query.filter_by(_uid=uid).first()
+    except Exception:
+        return None
 
 
 def _validate_upload_file(file_storage):
@@ -55,9 +81,10 @@ def _validate_upload_file(file_storage):
 
 
 @social_api.route("/bootstrap", methods=["GET"])
-@token_required()
 def social_bootstrap():
-    user = g.current_user
+    user = _resolve_authenticated_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
     party = social_core.get_party_for_user(user.id)
 
     return jsonify(
@@ -77,8 +104,11 @@ def social_bootstrap():
 
 
 @social_api.route("/upload-image", methods=["POST"])
-@token_required()
 def social_upload_image():
+    user = _resolve_authenticated_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
     file_storage = request.files.get("image")
     ok, message, extension = _validate_upload_file(file_storage)
     if not ok:

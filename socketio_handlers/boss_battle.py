@@ -1213,31 +1213,8 @@ def init_boss_battle_socket(socketio):
             }, to=existing_opponent_sid)
 
             socketio.emit('pvp_match_ready', {
-                'message': 'Both players are in the arena!',
+                'message': 'Both players are in the arena! Press Ready to start.',
                 'playerCount': get_pvp_player_count(room),
-                'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
-                'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
-            }, room=room_name)
-
-            if get_pvp_player_count(room) >= 2 and not room['battle_active']:
-                room['battle_active'] = True
-                socketio.emit('pvp_battle_start', {
-                    'message': 'Battle starting!',
-                    'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
-                    'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
-                }, room=room_name)
-
-        # Safety: if two players are present but battle never started, start it now.
-        if get_pvp_player_count(room) >= 2 and not room['battle_active']:
-            room['battle_active'] = True
-            socketio.emit('pvp_match_ready', {
-                'message': 'Both players are in the arena!',
-                'playerCount': get_pvp_player_count(room),
-                'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
-                'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
-            }, room=room_name)
-            socketio.emit('pvp_battle_start', {
-                'message': 'Battle starting!',
                 'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
                 'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
             }, room=room_name)
@@ -1253,7 +1230,11 @@ def init_boss_battle_socket(socketio):
         room['ready_players'].add(sid)
         if len(room['ready_players']) >= 2 and get_pvp_player_count(room) >= 2:
             room['battle_active'] = True
-            emit('pvp_battle_start', {}, room=get_pvp_room_name(room_id))
+            emit('pvp_battle_start', {
+                'message': 'Battle starting!',
+                'player1': room['players'].get(room['player_order'][0]) if len(room['player_order']) > 0 else None,
+                'player2': room['players'].get(room['player_order'][1]) if len(room['player_order']) > 1 else None
+            }, room=get_pvp_room_name(room_id))
 
     @socketio.on('pvp_move')
     def handle_pvp_move(data):

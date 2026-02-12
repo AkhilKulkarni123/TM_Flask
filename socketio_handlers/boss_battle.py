@@ -361,12 +361,15 @@ def init_boss_battle_socket(socketio):
             return
 
         # Track damage dealt and bullets hit by this player
+        # Track damage dealt and bullets hit by this player
         if 'damage_dealt' not in player:
             player['damage_dealt'] = 0
-        player['damage_dealt'] += damage
-
         if 'bullets_hit' not in player:
             player['bullets_hit'] = 0
+        if 'bullets_fired' not in player:
+            player['bullets_fired'] = 0
+            
+        player['damage_dealt'] += damage
         player['bullets_hit'] += 1
 
         # Reduce boss health
@@ -383,16 +386,22 @@ def init_boss_battle_socket(socketio):
         }, room=room_id)
 
         # Check if boss is defeated
+        # Check if boss is defeated
         if boss_battles[room_id]['boss_health'] <= 0:
             # Collect all players' stats for the victory screen
             all_player_stats = []
             for player_sid, player_data in boss_battles[room_id]['players'].items():
+                bullets_fired = player_data.get('bullets_fired', 0)
+                bullets_hit = player_data.get('bullets_hit', 0)
                 all_player_stats.append({
                     'sid': player_sid,
                     'username': player_data.get('username', 'Unknown'),
                     'character': player_data.get('character', 'knight'),
                     'damage_dealt': player_data.get('damage_dealt', 0),
+                    'bullets_fired': bullets_fired,
+                    'bullets_hit': bullets_hit,
                     'lives': player_data.get('lives', 0),
+                    'lives_lost': player_data.get('lives_lost', 0),
                     'bullets_used': player_data.get('bullets_used', 0),
                     'powerups_collected': player_data.get('powerups_collected', [])
                 })
@@ -916,21 +925,22 @@ def init_boss_battle_socket(socketio):
 
         player = boss_battles[room_id]['players'][sid]
 
-        # Update player stats from client report
+        # Update player stats from client report (use max to combine with server-tracked stats)
         if 'bullets_fired' in data:
-            player['bullets_fired'] = data['bullets_fired']
+            player['bullets_fired'] = max(player.get('bullets_fired', 0), data['bullets_fired'])
         if 'bullets_hit' in data:
-            player['bullets_hit'] = data['bullets_hit']
+            # Client-reported hits should match what server tracked, but use client value if higher
+            player['bullets_hit'] = max(player.get('bullets_hit', 0), data['bullets_hit'])
         if 'lives_lost' in data:
             player['lives_lost'] = data['lives_lost']
         if 'damage_dealt' in data:
-            player['damage_dealt'] = data['damage_dealt']
+            # Use max to combine client and server damage tracking
+            player['damage_dealt'] = max(player.get('damage_dealt', 0), data['damage_dealt'])
         if 'powerups_collected' in data:
             player['powerups_collected'] = data['powerups_collected']
 
-        print(f"[BOSS] Player {player.get('username')} reported stats: bullets_fired={data.get('bullets_fired')}, damage={data.get('damage_dealt')}")
-
-    # Periodic powerup spawning is triggered by clients
+        print(f"[BOSS] Player {player.get('username')} reported stats: bullets_fired={data.get('bullets_fired')}, bullets_hit={data.get('bullets_hit')}, damage={data.get('damage_dealt')}")
+        # Periodic powerup spawning is triggered by clients
     # to avoid needing a background thread
 
     # ==================== LEGACY EVENT HANDLERS ====================

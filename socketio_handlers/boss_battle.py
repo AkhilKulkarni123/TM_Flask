@@ -325,11 +325,12 @@ def init_boss_battle_socket(socketio):
         sid = request.sid
 
         if room_id and room_id in boss_battles:
-            # Track bullets fired for this player
             if sid in boss_battles[room_id]['players']:
                 player = boss_battles[room_id]['players'][sid]
                 if 'bullets_fired' not in player:
                     player['bullets_fired'] = 0
+                if 'bullets_hit' not in player:
+                    player['bullets_hit'] = 0
                 player['bullets_fired'] += 1
 
             emit('boss_player_bullet', {
@@ -370,7 +371,7 @@ def init_boss_battle_socket(socketio):
             player['bullets_fired'] = 0
             
         player['damage_dealt'] += damage
-        player['bullets_hit'] += 1
+        player['bullets_hit'] = player.get('bullets_hit', 0) + 1
 
         # Reduce boss health
         boss_battles[room_id]['boss_health'] -= damage
@@ -929,8 +930,10 @@ def init_boss_battle_socket(socketio):
         if 'bullets_fired' in data:
             player['bullets_fired'] = max(player.get('bullets_fired', 0), data['bullets_fired'])
         if 'bullets_hit' in data:
-            # Client-reported hits should match what server tracked, but use client value if higher
-            player['bullets_hit'] = max(player.get('bullets_hit', 0), data['bullets_hit'])
+            reported_hit = int(data['bullets_hit'])
+            reported_fired = int(data.get('bullets_fired', player.get('bullets_fired', 1)) or 1)
+            # Clamp bullets_hit to never exceed bullets_fired
+            player['bullets_hit'] = min(reported_hit, reported_fired)
         if 'lives_lost' in data:
             player['lives_lost'] = data['lives_lost']
         if 'damage_dealt' in data:

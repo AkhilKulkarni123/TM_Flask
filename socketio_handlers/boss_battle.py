@@ -26,6 +26,8 @@ pvp_sid_mapping = {}  # { sid: room_id } - tracks which PVP room a player is in
 PVP_ROOM_PREFIX = 'pvp_arena'
 MAX_PVP_PLAYERS = 2
 pvp_room_counter = 1
+# Mode selection viewers (not yet in arena)
+pvp_mode_viewers = set()
 
 
 # Multiplayer collision tuning (server authoritative)
@@ -797,6 +799,8 @@ def init_boss_battle_socket(socketio):
         # Clean up PVP arena (uses module-level pvp_sid_mapping)
         if sid in pvp_sid_mapping:
             cleanup_pvp_player(sid)
+        if sid in pvp_mode_viewers:
+            pvp_mode_viewers.discard(sid)
 
         # Clean up SLITHERRUSH arenas
         try:
@@ -1118,7 +1122,26 @@ def init_boss_battle_socket(socketio):
                 'playerCount': get_pvp_player_count(room),
                 'battleActive': room['battle_active']
             })
-        emit('pvp_status', get_pvp_aggregate_status())
+        status = get_pvp_aggregate_status()
+        status['viewerCount'] = len(pvp_mode_viewers)
+        emit('pvp_status', status)
+
+    @socketio.on('pvp_mode_viewer_join')
+    def handle_pvp_mode_viewer_join(data):
+        sid = request.sid
+        pvp_mode_viewers.add(sid)
+        status = get_pvp_aggregate_status()
+        status['viewerCount'] = len(pvp_mode_viewers)
+        emit('pvp_status', status)
+
+    @socketio.on('pvp_mode_viewer_leave')
+    def handle_pvp_mode_viewer_leave(data):
+        sid = request.sid
+        if sid in pvp_mode_viewers:
+            pvp_mode_viewers.discard(sid)
+        status = get_pvp_aggregate_status()
+        status['viewerCount'] = len(pvp_mode_viewers)
+        emit('pvp_status', status)
 
     @socketio.on('pvp_join')
     def handle_pvp_join(data):

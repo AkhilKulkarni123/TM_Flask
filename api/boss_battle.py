@@ -77,7 +77,9 @@ def join_boss_battle():
                 return jsonify({'error': 'You need at least 10 bullets to fight the boss', 'bullets': progress.bullets if progress else 0}), 403
         
         # Find an active room with space (max 10 players) or create a new one
+        # Use a stable room_id to keep multiplayer together by default.
         MAX_PLAYERS_PER_ROOM = 10
+        DEFAULT_ROOM_ID = 'boss_battle_room'
         room = None
         if preferred_room_id:
             preferred = BossRoom.query.filter_by(
@@ -87,6 +89,15 @@ def join_boss_battle():
             ).first()
             if preferred and len(preferred.players) < MAX_PLAYERS_PER_ROOM:
                 room = preferred
+
+        if room is None:
+            shared_room = BossRoom.query.filter_by(
+                room_id=DEFAULT_ROOM_ID,
+                is_active=True,
+                is_completed=False,
+            ).first()
+            if shared_room and len(shared_room.players) < MAX_PLAYERS_PER_ROOM:
+                room = shared_room
 
         active_rooms = BossRoom.query.filter_by(is_active=True, is_completed=False).all()
         if room is None:
@@ -98,6 +109,10 @@ def join_boss_battle():
         if not room:
             # All rooms full or none exist - create new room
             room = BossRoom(max_boss_health=2000)
+            # Only force the shared room id if it doesn't already exist.
+            existing_shared = BossRoom.query.filter_by(room_id=DEFAULT_ROOM_ID).first()
+            if not existing_shared:
+                room.room_id = DEFAULT_ROOM_ID
             db.session.add(room)
             db.session.flush()
         

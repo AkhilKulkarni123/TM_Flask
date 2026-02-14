@@ -136,8 +136,8 @@ def init_boss_battle_socket(socketio):
 
         all_player_stats = []
         for player_sid, player_data in boss_battles[room_id]['players'].items():
-            bullets_fired = player_data.get('bullets_fired', 0)
             bullets_hit = player_data.get('bullets_hit', 0)
+            bullets_fired = max(player_data.get('bullets_fired', 0), bullets_hit)
             all_player_stats.append({
                 'sid': player_sid,
                 'username': player_data.get('username', 'Unknown'),

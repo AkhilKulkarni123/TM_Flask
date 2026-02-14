@@ -951,29 +951,22 @@ def init_boss_battle_socket(socketio):
 
         player = boss_battles[room_id]['players'][sid]
 
-        # Update player stats from client report
-        if 'bullets_fired' in data:
-            reported_fired = int(data['bullets_fired'] or 0)
-            player['bullets_fired'] = max(player.get('bullets_fired', 0), reported_fired)
-        if 'bullets_hit' in data:
-            reported_hit = int(data['bullets_hit'] or 0)
-            reported_fired = int(player.get('bullets_fired', 1) or 1)
-            player['bullets_hit'] = min(reported_hit, reported_fired)
+        # Only take lives_lost and powerups from client — server already tracks
+        # bullets_fired (via boss_player_shoot) and bullets_hit (via boss_damage) accurately
         if 'lives_lost' in data:
             player['lives_lost'] = int(data['lives_lost'] or 0)
-        if 'damage_dealt' in data:
-            player['damage_dealt'] = max(player.get('damage_dealt', 0), int(data['damage_dealt'] or 0))
         if 'powerups_collected' in data:
             player['powerups_collected'] = data['powerups_collected']
+        if 'damage_dealt' in data:
+            client_damage = int(data['damage_dealt'] or 0)
+            player['damage_dealt'] = max(player.get('damage_dealt', 0), client_damage)
 
         player['stats_reported'] = True
         print(f"[BOSS] Player {player.get('username')} reported stats: bullets_fired={player.get('bullets_fired')}, bullets_hit={player.get('bullets_hit')}, damage={player.get('damage_dealt')}, lives_lost={player.get('lives_lost')}")
 
-        # If victory is pending, check if all players have reported (or trigger after short grace period)
         if boss_battles[room_id].get('victory_pending'):
             all_players = boss_battles[room_id]['players']
             all_reported = all(p.get('stats_reported') for p in all_players.values())
-
             if all_reported:
                 _broadcast_victory(room_id)
             elif not boss_battles[room_id].get('victory_timer_set'):

@@ -122,6 +122,48 @@ def init_boss_battle_socket(socketio):
         if room_id not in boss_battles:
             return 0
         return len([p for p in boss_battles[room_id]['players'].values() if p.get('status') == 'alive'])
+    
+    # ADD this function right before:  @socketio.on('boss_join_room')
+    def _broadcast_victory(room_id):
+        """Collect final stats and broadcast boss_defeated to all players"""
+        if room_id not in boss_battles:
+            return
+        if not boss_battles[room_id].get('victory_pending'):
+            return
+
+        # Clear the flag first to prevent double-broadcast
+        boss_battles[room_id]['victory_pending'] = False
+
+        all_player_stats = []
+        for player_sid, player_data in boss_battles[room_id]['players'].items():
+            bullets_fired = player_data.get('bullets_fired', 0)
+            bullets_hit = player_data.get('bullets_hit', 0)
+            all_player_stats.append({
+                'sid': player_sid,
+                'username': player_data.get('username', 'Unknown'),
+                'character': player_data.get('character', 'knight'),
+                'damage_dealt': player_data.get('damage_dealt', 0),
+                'bullets_fired': bullets_fired,
+                'bullets_hit': bullets_hit,
+                'lives': player_data.get('lives', 0),
+                'lives_lost': player_data.get('lives_lost', 0),
+                'powerups_collected': player_data.get('powerups_collected', [])
+            })
+
+        socketio.emit('boss_defeated', {
+            'message': 'The boss has been defeated!',
+            'players': get_room_players_list(room_id),
+            'all_player_stats': all_player_stats
+        }, room=room_id)
+
+        # Reset boss for next battle
+        boss_battles[room_id]['boss_health'] = boss_battles[room_id]['max_health']
+        # Reset reported flags
+        for p in boss_battles[room_id]['players'].values():
+            p['stats_reported'] = False
+        print(f"[BOSS] Victory broadcast sent for room {room_id} with {len(all_player_stats)} player stats.")
+
+
 
     # ==================== JOIN ROOM ====================
     @socketio.on('boss_join_room')
@@ -388,34 +430,16 @@ def init_boss_battle_socket(socketio):
 
         # Check if boss is defeated
         # Check if boss is defeated
+        # ADD this replacement block:
         if boss_battles[room_id]['boss_health'] <= 0:
-            # Collect all players' stats for the victory screen
-            all_player_stats = []
-            for player_sid, player_data in boss_battles[room_id]['players'].items():
-                bullets_fired = player_data.get('bullets_fired', 0)
-                bullets_hit = player_data.get('bullets_hit', 0)
-                all_player_stats.append({
-                    'sid': player_sid,
-                    'username': player_data.get('username', 'Unknown'),
-                    'character': player_data.get('character', 'knight'),
-                    'damage_dealt': player_data.get('damage_dealt', 0),
-                    'bullets_fired': bullets_fired,
-                    'bullets_hit': bullets_hit,
-                    'lives': player_data.get('lives', 0),
-                    'lives_lost': player_data.get('lives_lost', 0),
-                    'bullets_used': player_data.get('bullets_used', 0),
-                    'powerups_collected': player_data.get('powerups_collected', [])
-                })
-
-            emit('boss_defeated', {
-                'message': 'The boss has been defeated!',
-                'players': get_room_players_list(room_id),
-                'all_player_stats': all_player_stats
+            # Mark room as pending victory — wait for stats reports before broadcasting win
+            boss_battles[room_id]['victory_pending'] = True
+            boss_battles[room_id]['victory_reporter'] = sid
+            # Ask all players to report their stats immediately
+            emit('boss_request_final_stats', {
+                'room_id': room_id
             }, room=room_id)
-
-            # Reset boss for next battle
-            boss_battles[room_id]['boss_health'] = boss_battles[room_id]['max_health']
-            print(f"[BOSS] Boss defeated in room {room_id}! Resetting boss health.")
+            print(f"[BOSS] Boss defeated in room {room_id}! Waiting for player stats reports.")
 
     # ==================== PLAYER HIT ====================
     @socketio.on('boss_player_hit')
@@ -912,9 +936,10 @@ def init_boss_battle_socket(socketio):
 
         print(f"[BOSS] Player {username} collected powerup {powerup_id} ({powerup_type}) in room {room_id}")
 
+    # REMOVE the existing handle_report_stats function and REPLACE with:
     @socketio.on('boss_report_stats')
     def handle_report_stats(data):
-        """Handle player reporting their battle stats"""
+        """Handle player reporting their battle stats — triggers victory once all players report"""
         room_id = data.get('room_id')
         sid = request.sid
 
@@ -926,24 +951,39 @@ def init_boss_battle_socket(socketio):
 
         player = boss_battles[room_id]['players'][sid]
 
-        # Update player stats from client report (use max to combine with server-tracked stats)
+        # Update player stats from client report
         if 'bullets_fired' in data:
-            player['bullets_fired'] = max(player.get('bullets_fired', 0), data['bullets_fired'])
+            reported_fired = int(data['bullets_fired'] or 0)
+            player['bullets_fired'] = max(player.get('bullets_fired', 0), reported_fired)
         if 'bullets_hit' in data:
-            reported_hit = int(data['bullets_hit'])
-            reported_fired = int(data.get('bullets_fired', player.get('bullets_fired', 1)) or 1)
-            # Clamp bullets_hit to never exceed bullets_fired
+            reported_hit = int(data['bullets_hit'] or 0)
+            reported_fired = int(player.get('bullets_fired', 1) or 1)
             player['bullets_hit'] = min(reported_hit, reported_fired)
         if 'lives_lost' in data:
-            player['lives_lost'] = data['lives_lost']
+            player['lives_lost'] = int(data['lives_lost'] or 0)
         if 'damage_dealt' in data:
-            # Use max to combine client and server damage tracking
-            player['damage_dealt'] = max(player.get('damage_dealt', 0), data['damage_dealt'])
+            player['damage_dealt'] = max(player.get('damage_dealt', 0), int(data['damage_dealt'] or 0))
         if 'powerups_collected' in data:
             player['powerups_collected'] = data['powerups_collected']
 
-        print(f"[BOSS] Player {player.get('username')} reported stats: bullets_fired={data.get('bullets_fired')}, bullets_hit={data.get('bullets_hit')}, damage={data.get('damage_dealt')}")
-        # Periodic powerup spawning is triggered by clients
+        player['stats_reported'] = True
+        print(f"[BOSS] Player {player.get('username')} reported stats: bullets_fired={player.get('bullets_fired')}, bullets_hit={player.get('bullets_hit')}, damage={player.get('damage_dealt')}, lives_lost={player.get('lives_lost')}")
+
+        # If victory is pending, check if all players have reported (or trigger after short grace period)
+        if boss_battles[room_id].get('victory_pending'):
+            all_players = boss_battles[room_id]['players']
+            all_reported = all(p.get('stats_reported') for p in all_players.values())
+
+            if all_reported:
+                _broadcast_victory(room_id)
+            elif not boss_battles[room_id].get('victory_timer_set'):
+                boss_battles[room_id]['victory_timer_set'] = True
+                def delayed_victory():
+                    if room_id in boss_battles and boss_battles[room_id].get('victory_pending'):
+                        _broadcast_victory(room_id)
+                timer = threading.Timer(3.0, delayed_victory)
+                timer.daemon = True
+                timer.start()
     # to avoid needing a background thread
 
     # ==================== LEGACY EVENT HANDLERS ====================

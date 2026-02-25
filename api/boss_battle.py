@@ -100,6 +100,13 @@ def join_boss_battle():
                 room = shared_room
 
         active_rooms = BossRoom.query.filter_by(is_active=True, is_completed=False).all()
+        # Clean up empty rooms that are still marked active
+        for ar in active_rooms:
+            if len(ar.players) == 0:
+                ar.is_active = False
+                db.session.flush()
+        # Re-query after cleanup
+        active_rooms = BossRoom.query.filter_by(is_active=True, is_completed=False).all()
         if room is None:
             for candidate in active_rooms:
                 if len(candidate.players) < MAX_PLAYERS_PER_ROOM:
@@ -116,19 +123,14 @@ def join_boss_battle():
             db.session.add(room)
             db.session.flush()
         
-        # Check if player already in this room
-        existing_player = BossPlayer.query.filter_by(
-            room_id=room.id,
-            user_id=user.id
-        ).first()
-        
-        if existing_player:
-            return jsonify({
-                'message': 'Already in this room',
-                'room_id': room.room_id,
-                'room': room.to_dict(),
-                'player': existing_player.to_dict()
-            }), 200
+        # Clean up any stale player records for this user in ANY room
+        # (from previous sessions that didn't clean up properly)
+        stale_players = BossPlayer.query.filter_by(user_id=user.id).all()
+        for sp in stale_players:
+            db.session.delete(sp)
+        if stale_players:
+            db.session.flush()
+            logger.info(f"Cleaned up {len(stale_players)} stale BossPlayer records for user {user.id}")
         
         # Add player to room (use progress lives or default to 5)
         player_lives = progress.lives if progress else 5

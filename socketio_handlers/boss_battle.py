@@ -483,6 +483,7 @@ def init_boss_battle_socket(socketio):
             player['lives'] = 0
             player['status'] = 'dead'
             username = player['username']
+            dead_user_id = player.get('user_id')
 
             # Remove dead player from the room
             del boss_battles[room_id]['players'][sid]
@@ -490,6 +491,19 @@ def init_boss_battle_socket(socketio):
             # Clean up sid mapping
             if sid in sid_to_room:
                 del sid_to_room[sid]
+
+            # Clean up database BossPlayer record
+            if dead_user_id:
+                try:
+                    from __init__ import db as _db
+                    from model.boss_room import BossPlayer as _BP
+                    stale = _BP.query.filter_by(user_id=dead_user_id).all()
+                    for sp in stale:
+                        _db.session.delete(sp)
+                    if stale:
+                        _db.session.commit()
+                except Exception as e:
+                    print(f"[BOSS] DB cleanup error on death: {e}")
 
             player_count = len(boss_battles[room_id]['players'])
             alive_count = get_alive_count(room_id)
@@ -748,8 +762,9 @@ def init_boss_battle_socket(socketio):
 
         player = boss_battles[room_id]['players'][sid]
         username = player['username']
+        leaving_user_id = player.get('user_id')
 
-        # Remove player from battle
+        # Remove player from in-memory battle
         del boss_battles[room_id]['players'][sid]
 
         # Clean up sid mapping
@@ -770,6 +785,19 @@ def init_boss_battle_socket(socketio):
             'playerCount': player_count
         }, room=room_id)
 
+        # Clean up database BossPlayer record
+        if leaving_user_id:
+            try:
+                from __init__ import db
+                from model.boss_room import BossPlayer
+                stale = BossPlayer.query.filter_by(user_id=leaving_user_id).all()
+                for sp in stale:
+                    db.session.delete(sp)
+                if stale:
+                    db.session.commit()
+            except Exception as e:
+                print(f"[BOSS] DB cleanup error on leave: {e}")
+
         print(f"[BOSS] Player {username} ({sid}) left room {room_id}. Remaining: {player_count}")
 
         # Clean up empty rooms
@@ -786,13 +814,15 @@ def init_boss_battle_socket(socketio):
 
         # Find which room this player was in
         room_id = sid_to_room.get(sid)
+        disconnected_user_id = None
 
         if room_id and room_id in boss_battles:
             if sid in boss_battles[room_id]['players']:
                 player = boss_battles[room_id]['players'][sid]
                 username = player['username']
+                disconnected_user_id = player.get('user_id')
 
-                # Remove player from battle
+                # Remove player from in-memory battle
                 del boss_battles[room_id]['players'][sid]
 
                 player_count = len(boss_battles[room_id]['players'])
@@ -817,22 +847,24 @@ def init_boss_battle_socket(socketio):
         if sid in sid_to_room:
             del sid_to_room[sid]
 
+        # Clean up database BossPlayer record for this user
+        if disconnected_user_id:
+            try:
+                from __init__ import db
+                from model.boss_room import BossPlayer
+                stale = BossPlayer.query.filter_by(user_id=disconnected_user_id).all()
+                for sp in stale:
+                    db.session.delete(sp)
+                if stale:
+                    db.session.commit()
+                    print(f"[BOSS] Cleaned up {len(stale)} DB BossPlayer records for user_id {disconnected_user_id}")
+            except Exception as e:
+                print(f"[BOSS] DB cleanup error on disconnect: {e}")
+
         # Clean up lobby membership and notify other lobby members
         if sid in lobby_members:
             username = lobby_members[sid].get('username', 'Unknown')
             del lobby_members[sid]
-            # Notify remaining lobby members
-            message_data = {
-                'sid': sid,
-                'username': 'System',
-                'character': 'knight',
-                'content': f'{username} disconnected'
-            }
-            emit('boss_chat_message', message_data, room=LOBBY_ROOM)
-            # Send updated member list
-            emit('boss_lobby_members', {
-                'members': [{'sid': s, **m} for s, m in lobby_members.items()]
-            }, room=LOBBY_ROOM)
 
             lobby_count = len(lobby_members)
 
@@ -843,9 +875,11 @@ def init_boss_battle_socket(socketio):
                 'character': 'knight',
                 'content': f'{username} disconnected'
             }
-            for member_sid in list(lobby_members.keys()):
-                socketio.emit('boss_chat_message', message_data, to=member_sid)
-                socketio.emit('boss_lobby_player_count', {'playerCount': lobby_count}, to=member_sid)
+            emit('boss_chat_message', message_data, room=LOBBY_ROOM)
+            emit('boss_lobby_members', {
+                'members': [{'sid': s, **m} for s, m in lobby_members.items()]
+            }, room=LOBBY_ROOM)
+            emit('boss_lobby_player_count', {'playerCount': lobby_count}, room=LOBBY_ROOM)
 
             print(f"[BOSS] Player {username} ({sid}) disconnected from lobby. Lobby size: {lobby_count}")
 

@@ -179,6 +179,9 @@ def init_boss_battle_socket(socketio):
         username = player_data.get('username', 'Guest')
         user_id = player_data.get('user_id', sid)
         character = player_data.get('character', 'knight')
+        weapon_type = player_data.get('weapon_type', '')
+        avatar_url = player_data.get('avatar_url', '')
+        avatar_data = player_data.get('avatar_data', '')
         bullets = player_data.get('bullets', 0)
         lives = player_data.get('lives', 5)
         x = player_data.get('x', 400)
@@ -216,6 +219,9 @@ def init_boss_battle_socket(socketio):
                 'username': username,
                 'user_id': user_id,
                 'character': character,
+                'weapon_type': weapon_type,
+                'avatar_url': avatar_url,
+                'avatar_data': avatar_data,
                 'bullets': bullets,
                 'lives': lives,
                 'x': x,
@@ -238,7 +244,10 @@ def init_boss_battle_socket(socketio):
                 'x': x,
                 'y': y,
                 'bullets': bullets,
-                'lives': lives
+                'lives': lives,
+                'weapon_type': weapon_type,
+                'avatar_url': avatar_url,
+                'avatar_data': avatar_data
             },
             'bounds': room_bounds
         })
@@ -250,6 +259,9 @@ def init_boss_battle_socket(socketio):
                 'username': username,
                 'user_id': user_id,
                 'character': character,
+                'weapon_type': weapon_type,
+                'avatar_url': avatar_url,
+                'avatar_data': avatar_data,
                 'bullets': bullets,
                 'lives': lives,
                 'x': x,
@@ -380,7 +392,8 @@ def init_boss_battle_socket(socketio):
                 'bulletY': data.get('bulletY'),
                 'dx': data.get('dx'),
                 'dy': data.get('dy'),
-                'character': data.get('character')
+                'character': data.get('character'),
+                'weapon_type': data.get('weapon_type', '')
             }, room=room_id, include_self=False)
 
     # ==================== BOSS DAMAGE ====================
@@ -573,6 +586,9 @@ def init_boss_battle_socket(socketio):
         """Handle player joining the lobby for pre-battle chat"""
         username = data.get('username', 'Guest')
         character = data.get('character', 'knight')
+        weapon_type = data.get('weapon_type', '')
+        avatar_url = data.get('avatar_url', '')
+        avatar_data = data.get('avatar_data', '')
         sid = request.sid
 
         # Join the lobby socket room
@@ -581,7 +597,10 @@ def init_boss_battle_socket(socketio):
         # Track lobby member
         lobby_members[sid] = {
             'username': username,
-            'character': character
+            'character': character,
+            'weapon_type': weapon_type,
+            'avatar_url': avatar_url,
+            'avatar_data': avatar_data
         }
 
         lobby_count = len(lobby_members)

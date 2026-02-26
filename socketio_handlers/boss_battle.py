@@ -169,23 +169,32 @@ def init_boss_battle_socket(socketio):
     @socketio.on('boss_join_room')
     def handle_join_room(data):
         """Handle player joining a boss battle room"""
-        room_id = data.get('room_id', 'default_room')
-        player_data = data.get('player', {})
-        incoming_bounds = data.get('bounds')
-        boss_health = data.get('boss_health', 1000)
-        max_boss_health = data.get('max_boss_health', 1000)
+        try:
+            room_id = data.get('room_id', 'default_room')
+        except Exception:
+            emit('boss_error', {'message': 'Invalid room join request'})
+            return
+        try:
+            player_data = data.get('player', {})
+            incoming_bounds = data.get('bounds')
+            boss_health = data.get('boss_health', 1000)
+            max_boss_health = data.get('max_boss_health', 1000)
 
-        sid = request.sid
-        username = player_data.get('username', 'Guest')
-        user_id = player_data.get('user_id', sid)
-        character = player_data.get('character', 'knight')
-        weapon_type = player_data.get('weapon_type', '')
-        avatar_url = player_data.get('avatar_url', '')
-        avatar_data = player_data.get('avatar_data', '')
-        bullets = player_data.get('bullets', 0)
-        lives = player_data.get('lives', 5)
-        x = player_data.get('x', 400)
-        y = player_data.get('y', 500)
+            sid = request.sid
+            username = player_data.get('username', 'Guest')
+            user_id = player_data.get('user_id', sid)
+            character = player_data.get('character', 'knight')
+            weapon_type = player_data.get('weapon_type', '')
+            avatar_url = player_data.get('avatar_url', '')
+            avatar_data = player_data.get('avatar_data', '')
+            bullets = player_data.get('bullets', 0)
+            lives = player_data.get('lives', 5)
+            x = player_data.get('x', 400)
+            y = player_data.get('y', 500)
+        except Exception as e:
+            print(f"[BOSS] ERROR parsing join_room data for room {room_id}: {e}")
+            emit('boss_error', {'message': 'Failed to parse join request'})
+            return
 
         # Initialize room if it doesn't exist
         if room_id not in boss_battles:

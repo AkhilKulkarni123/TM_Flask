@@ -1,7 +1,7 @@
 """ database dependencies to support sqliteDB examples """
 from flask import current_app
 from flask_login import UserMixin
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -156,6 +156,7 @@ class User(db.Model, UserMixin):
     _grade_data = db.Column(db.JSON, unique=False, nullable=True)
     _ap_exam = db.Column(db.JSON, unique=False, nullable=True)
     _school = db.Column(db.String(255), default="Unknown", nullable=True)
+    _last_login = db.Column(db.DateTime, nullable=True)  # Track last login time
 
     # Define many-to-many relationship with Section model through UserSection table 
     # Overlaps setting avoids cicular dependencies with UserSection class
@@ -340,6 +341,21 @@ class User(db.Model, UserMixin):
     def school(self, school):
         self._school = school
 
+    @property
+    def last_login(self):
+        """Gets the user's last login timestamp."""
+        return self._last_login
+    
+    def update_last_login(self):
+        """Updates the last login timestamp to current time. Returns the previous last_login value."""
+        previous_login = self._last_login
+        self._last_login = datetime.utcnow()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return previous_login
+
     # CRUD create/add a new record to the table
     # returns self or None on error
     def create(self, inputs=None):
@@ -368,7 +384,8 @@ class User(db.Model, UserMixin):
             "grade_data": self.grade_data,
             "ap_exam": self.ap_exam,
             "password": self._password,  # Only for internal use, not for API
-            "school": self.school
+            "school": self.school,
+            "last_login": self.last_login.isoformat() if self.last_login else None
         }
         sections = self.read_sections()
         data.update(sections)

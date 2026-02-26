@@ -4,6 +4,7 @@ from flask_restful import Api, Resource # used for REST API building
 from datetime import datetime
 from __init__ import app
 from api.jwt_authorize import token_required
+from api.authenticate import set_jwt_cookie  # Use centralized cookie setting
 from model.user import User
 from model.github import GitHubUser
 # api/user.py (add near existing endpoints)
@@ -176,28 +177,8 @@ class UserAPI:
                             'token': token
                         }), 200)
                         
-                        # Set cookie
-                        is_production = is_production_request()
-                        if is_production:
-                            response.set_cookie(
-                                current_app.config.get("JWT_TOKEN_NAME", "jwt"),
-                                token,
-                                max_age=43200,
-                                secure=True,
-                                httponly=True,
-                                path='/',
-                                samesite='None'
-                            )
-                        else:
-                            response.set_cookie(
-                                current_app.config.get("JWT_TOKEN_NAME", "jwt"),
-                                token,
-                                max_age=43200,
-                                secure=False,
-                                httponly=False,
-                                path='/',
-                                samesite='Lax'
-                            )
+                        # Set cookie using centralized function
+                        set_jwt_cookie(response, token)
                         
                         return response
                     else:
@@ -218,28 +199,8 @@ class UserAPI:
                     'token': token
                 }), 200)
                 
-                # Set cookie
-                is_production = is_production_request()
-                if is_production:
-                    response.set_cookie(
-                        current_app.config.get("JWT_TOKEN_NAME", "jwt"),
-                        token,
-                        max_age=43200,
-                        secure=True,
-                        httponly=True,
-                        path='/',
-                        samesite='None'
-                    )
-                else:
-                    response.set_cookie(
-                        current_app.config.get("JWT_TOKEN_NAME", "jwt"),
-                        token,
-                        max_age=43200,
-                        secure=False,
-                        httponly=False,
-                        path='/',
-                        samesite='Lax'
-                    )
+                # Set cookie using centralized function
+                set_jwt_cookie(response, token)
                 
                 return response
                 

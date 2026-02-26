@@ -126,17 +126,29 @@ class Authenticate(Resource):
             if not user.is_password(password):
                 return {'message': 'Invalid credentials'}, 401
             
+            # Track last login and determine if returning user
+            previous_login = user.update_last_login()
+            is_returning_user = previous_login is not None
+            
             # Generate JWT token
             token = jwt.encode({
                 '_uid': user._uid,
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
             }, current_app.config["SECRET_KEY"], algorithm="HS256")
             
+            # Build welcome message
+            if is_returning_user:
+                welcome_message = f"Welcome back, {user.name}!"
+            else:
+                welcome_message = f"Welcome, {user.name}!"
+            
             # Create response
             response = make_response(jsonify({
-                'message': 'Login successful',
+                'message': welcome_message,
                 'user': user.read(),
-                'token': token
+                'token': token,
+                'is_returning_user': is_returning_user,
+                'previous_login': previous_login.isoformat() if previous_login else None
             }), 200)
             
             # Set cookie with proper cross-origin settings
@@ -159,13 +171,47 @@ class GetUser(Resource):
         except Exception as e:
             return {'message': f'Error getting user: {str(e)}'}, 500
 
+def clear_jwt_cookie(response):
+    """Centralized JWT cookie clearing logic for cross-origin support.
+    
+    When clearing cookies, we must match the same attributes used when setting them.
+    """
+    cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
+    
+    # Detect if running in production or development
+    is_production = is_production_request()
+    
+    if is_production:
+        # Production: clear with matching cross-domain HTTPS attributes
+        response.set_cookie(
+            cookie_name,
+            '',
+            max_age=0,
+            secure=True,
+            httponly=True,
+            path='/',
+            samesite='None'
+        )
+    else:
+        # Development: clear with matching localhost attributes
+        response.set_cookie(
+            cookie_name,
+            '',
+            max_age=0,
+            secure=False,
+            httponly=False,
+            path='/',
+            samesite='Lax'
+        )
+    
+    return response
+
 class Logout(Resource):
     """User logout"""
     
     def post(self):
-        cookie_name = current_app.config.get("JWT_TOKEN_NAME", "jwt")
         response = make_response(jsonify({'message': 'Logout successful'}), 200)
-        response.set_cookie(cookie_name, '', max_age=0, path='/')
+        clear_jwt_cookie(response)
         return response
 
 # Register endpoints

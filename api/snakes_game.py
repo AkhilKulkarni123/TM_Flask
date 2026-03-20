@@ -162,26 +162,27 @@ class GetUnvisitedSquaresAPI(Resource):
         }, 200
 
 
+def _serialize_active_player(player):
+    """Serialize a single active player record to a JSON-safe dict."""
+    return {
+        "user_id": player.user_id,
+        "username": player.username,
+        "selected_character": player.selected_character,
+        "current_square": player.current_square,
+        "total_bullets": player.total_bullets,
+        "last_updated": player.last_updated.isoformat() if player.last_updated else None
+    }
+
+
 class ActivePlayersAPI(Resource):
     def get(self):
         """Get count and list of players actively playing (updated within last 10 seconds)"""
-        # Only count players who have made movements/changes in the last 10 seconds
         active_threshold = datetime.utcnow() - timedelta(seconds=10)
         active_players_query = SnakesGameData.query.filter(
             SnakesGameData.last_updated >= active_threshold
         ).order_by(SnakesGameData.last_updated.desc()).all()
 
-        # Build list of active players with relevant info
-        players_list = []
-        for player in active_players_query:
-            players_list.append({
-                "user_id": player.user_id,
-                "username": player.username,
-                "selected_character": player.selected_character,
-                "current_square": player.current_square,
-                "total_bullets": player.total_bullets,
-                "last_updated": player.last_updated.isoformat() if player.last_updated else None
-            })
+        players_list = [_serialize_active_player(p) for p in active_players_query]
 
         return {
             "active_players": len(players_list),
@@ -190,24 +191,26 @@ class ActivePlayersAPI(Resource):
         }, 200
 
 
+def _serialize_champion(champion):
+    """Serialize a single champion record to a JSON-safe dict."""
+    return {
+        "user_id": champion.user_id,
+        "username": champion.username,
+        "character": champion.selected_character,
+        "total_bullets": champion.total_bullets,
+        "time_played": champion.time_played,
+        "completed_at": champion.completed_at.isoformat() if champion.completed_at else None
+    }
+
+
 class ChampionsAPI(Resource):
     """Get all players who have completed the game"""
     def get(self):
-        # Get all players with game_status='completed', ordered by completion time
         champions = SnakesGameData.query.filter_by(
             game_status='completed'
         ).order_by(SnakesGameData.completed_at.asc()).all()
 
-        champions_list = []
-        for champion in champions:
-            champions_list.append({
-                "user_id": champion.user_id,
-                "username": champion.username,
-                "character": champion.selected_character,
-                "total_bullets": champion.total_bullets,
-                "time_played": champion.time_played,
-                "completed_at": champion.completed_at.isoformat() if champion.completed_at else None
-            })
+        champions_list = [_serialize_champion(c) for c in champions]
 
         return {
             "champions": champions_list,
@@ -236,6 +239,20 @@ class CompleteGameAPI(Resource):
         }, 200
 
 
+def _reset_game_fields(game_data):
+    """Reset all mutable game progress fields to their defaults."""
+    game_data.current_square = 1
+    game_data.visited_squares = [1]
+    game_data.total_bullets = 0
+    game_data.time_played = 0.0
+    game_data.lives = 5
+    game_data.boss_battle_attempts = 0
+    game_data.completed_lessons = []
+    game_data.unlocked_sections = ['half1']
+    game_data.selected_character = 'default'
+    game_data.game_status = 'active'
+
+
 class ResetProgressAPI(Resource):
     """Reset all game progress for the current user to start fresh"""
     @token_required()
@@ -249,17 +266,7 @@ class ResetProgressAPI(Resource):
         # Preserve champion status if they completed before
         was_champion = game_data.game_status == 'completed'
 
-        # Reset all progress
-        game_data.current_square = 1
-        game_data.visited_squares = [1]
-        game_data.total_bullets = 0
-        game_data.time_played = 0.0
-        game_data.lives = 5
-        game_data.boss_battle_attempts = 0
-        game_data.completed_lessons = []
-        game_data.unlocked_sections = ['half1']
-        game_data.selected_character = 'default'  # Reset character so they can choose again
-        game_data.game_status = 'active'
+        _reset_game_fields(game_data)
         # Keep completed_at if they were a champion (for hall of fame)
 
         db.session.commit()

@@ -80,30 +80,24 @@ class SnakesGameData(db.Model):
             'last_updated': self.last_updated.isoformat() if self.last_updated else None
         }
 
+    # Mapping of allowed payload keys to model attributes.
+    UPDATABLE_FIELDS = [
+        'total_bullets', 'time_played', 'current_square',
+        'boss_battle_attempts', 'selected_character', 'username',
+        'visited_squares', 'completed_lessons', 'unlocked_sections',
+        'lives', 'game_status',
+    ]
+
+    def apply_fields(self, data):
+        """Apply matching fields from *data* without committing."""
+        for field in self.UPDATABLE_FIELDS:
+            if field in data:
+                setattr(self, field, data[field])
+        return self
+
     def update(self, data):
-        """Update this record with a dictionary of values."""
-        if 'total_bullets' in data:
-            self.total_bullets = data['total_bullets']
-        if 'time_played' in data:
-            self.time_played = data['time_played']
-        if 'current_square' in data:
-            self.current_square = data['current_square']
-        if 'boss_battle_attempts' in data:
-            self.boss_battle_attempts = data['boss_battle_attempts']
-        if 'selected_character' in data:
-            self.selected_character = data['selected_character']
-        if 'username' in data:
-            self.username = data['username']
-        if 'visited_squares' in data:
-            self.visited_squares = data['visited_squares']
-        if 'completed_lessons' in data:
-            self.completed_lessons = data['completed_lessons']
-        if 'unlocked_sections' in data:
-            self.unlocked_sections = data['unlocked_sections']
-        if 'lives' in data:
-            self.lives = data['lives']
-        if 'game_status' in data:
-            self.game_status = data['game_status']
+        """Apply fields from *data* and persist to the database."""
+        self.apply_fields(data)
         db.session.commit()
         return self
 

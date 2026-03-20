@@ -38,6 +38,20 @@ def get_progress():
         return jsonify({'error': str(e)}), 500
 
 
+def _is_valid_lesson_number(lesson_number):
+    """Return True if lesson_number is an integer between 1 and 5."""
+    return isinstance(lesson_number, int) and 1 <= lesson_number <= 5
+
+
+def _apply_lesson_completion(record, lesson_number, bullets_earned):
+    """Mark a lesson complete, award bullets, and unlock Section 2 if ready."""
+    if lesson_number not in record.completed_lessons:
+        record.completed_lessons.append(lesson_number)
+        record.total_bullets += bullets_earned
+        if len(set(record.completed_lessons)) >= 5 and 'half2' not in record.unlocked_sections:
+            record.unlocked_sections.append('half2')
+
+
 @snakes_bp.route('/complete-lesson', methods=['POST'])
 @token_required()
 def complete_lesson():
@@ -47,18 +61,12 @@ def complete_lesson():
         data = request.get_json() or {}
         lesson_number = data.get('lesson_number')
         bullets_earned = data.get('bullets_earned', 0)
-        if not isinstance(lesson_number, int) or lesson_number < 1 or lesson_number > 5:
+        if not _is_valid_lesson_number(lesson_number):
             return jsonify({'error': 'Invalid lesson number'}), 400
         record = SnakesGameData.query.filter_by(user_id=user.id).first()
         if not record:
             return jsonify({'error': 'Game data not found'}), 404
-        # Update lesson completion if not already
-        if lesson_number not in record.completed_lessons:
-            record.completed_lessons.append(lesson_number)
-            record.total_bullets += bullets_earned
-            # Unlock second half after completing all five lessons
-            if len(set(record.completed_lessons)) >= 5 and 'half2' not in record.unlocked_sections:
-                record.unlocked_sections.append('half2')
+        _apply_lesson_completion(record, lesson_number, bullets_earned)
         db.session.commit()
         return jsonify({
             'message': f'Lesson {lesson_number} completed',
@@ -71,6 +79,25 @@ def complete_lesson():
         return jsonify({'error': str(e)}), 500
 
 
+def _is_valid_question_square(square):
+    """Return True if the square falls within the question section range."""
+    return (
+        isinstance(square, int)
+        and QUESTION_SECTION_MIN_SQUARE <= square <= QUESTION_SECTION_MAX_SQUARE
+    )
+
+
+def _apply_question_result(record, square, correct, bullets_earned):
+    """Update the record's position, visited list, and bullets for a question answer."""
+    record.current_square = square
+    if square not in record.visited_squares:
+        record.visited_squares.append(square)
+    if correct:
+        record.total_bullets += bullets_earned
+    if square >= QUESTION_SECTION_MAX_SQUARE and 'boss' not in record.unlocked_sections:
+        record.unlocked_sections.append('boss')
+
+
 @snakes_bp.route('/answer-question', methods=['POST'])
 @token_required()
 def answer_question():
@@ -81,26 +108,12 @@ def answer_question():
         square = data.get('square')
         bullets_earned = data.get('bullets_earned', 0)
         correct = bool(data.get('correct'))
-        # Validate square
-        if (
-            not isinstance(square, int)
-            or square < QUESTION_SECTION_MIN_SQUARE
-            or square > QUESTION_SECTION_MAX_SQUARE
-        ):
+        if not _is_valid_question_square(square):
             return jsonify({'error': 'Invalid square number'}), 400
         record = SnakesGameData.query.filter_by(user_id=user.id).first()
         if not record:
             return jsonify({'error': 'Game data not found'}), 404
-        # Update square and visited list
-        record.current_square = square
-        if square not in record.visited_squares:
-            record.visited_squares.append(square)
-        # Award bullets for correct answers
-        if correct:
-            record.total_bullets += bullets_earned
-        # Unlock boss battle when reaching square 50
-        if square >= QUESTION_SECTION_MAX_SQUARE and 'boss' not in record.unlocked_sections:
-            record.unlocked_sections.append('boss')
+        _apply_question_result(record, square, correct, bullets_earned)
         db.session.commit()
         return jsonify({
             'message': 'Question processed',
